@@ -1,6 +1,5 @@
--- Silent Aim для MM2 (только на убийцу) - ИСПРАВЛЕННЫЙ
--- Работает как настоящий Silent Aim: вы стреляете куда угодно, а пуля летит в убийцу
--- Кнопка на экране или клавиша S для включения/выключения
+-- Silent Aim для MM2 (исправленный)
+-- Работает через перехват выстрела
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,8 +12,8 @@ local LocalPlayer = Players.LocalPlayer
 -- ==============================================
 local Config = {
     Enabled = false,
-    TargetPart = "Head",
-    Prediction = 0.3,
+    TargetPart = "HumanoidRootPart",
+    Prediction = 0.2,
 }
 
 -- ==============================================
@@ -28,38 +27,18 @@ local function IsMurderer(player)
     local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return false end
     
-    -- Список оружия убийцы
     local murdererWeapons = {
         "knife", "blade", "dagger", "saw", "slasher", "axe", "scythe",
         "peppermint", "cookie", "edge", "batwing", "icewing", "bone",
         "hallow", "vampire", "cutter", "candy"
     }
     
-    -- Проверяем оружие в руках
     for _, tool in ipairs(character:GetChildren()) do
         if tool:IsA("Tool") then
             local name = tool.Name:lower()
             for _, wName in ipairs(murdererWeapons) do
                 if name:find(wName) or wName:find(name) then
                     return true
-                end
-            end
-            if tool.ToolTip and string.lower(tool.ToolTip):find("knife") then
-                return true
-            end
-        end
-    end
-    
-    -- Проверяем рюкзак
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") then
-                local name = tool.Name:lower()
-                for _, wName in ipairs(murdererWeapons) do
-                    if name:find(wName) or wName:find(name) then
-                        return true
-                    end
                 end
             end
         end
@@ -180,7 +159,6 @@ end
 button.MouseButton1Click:Connect(ToggleSilentAim)
 button.TouchTap:Connect(ToggleSilentAim)
 
--- Горячая клавиша S
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.S then
@@ -189,222 +167,122 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==============================================
--- ОСНОВНАЯ ЛОГИКА SILENT AIM
+-- ОСНОВНАЯ ЛОГИКА SILENT AIM (ИСПРАВЛЕННАЯ)
 -- ==============================================
 
--- Сохраняем оригинальный FireServer
+-- Находим Remote GunBeam
+local gunBeamRemote = ReplicatedStorage:FindFirstChild("WeaponEvents")
+if gunBeamRemote then
+    gunBeamRemote = gunBeamRemote:FindFirstChild("GunBeam")
+end
+
+print(gunBeamRemote and "✅ Найден Remote: GunBeam" or "❌ GunBeam не найден")
+
+-- Сохраняем оригинальные методы
 local originalFireServer = nil
 local originalInvokeServer = nil
 
--- Функция для поиска Remote выстрела
-local function FindShootRemote()
-    -- Ищем в ReplicatedStorage
-    for _, child in ipairs(ReplicatedStorage:GetDescendants()) do
-        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-            local name = child.Name:lower()
-            if name:find("shoot") or name:find("fire") or name:find("gun") or name:find("bullet") then
-                return child
-            end
-        end
-    end
-    
-    -- Ищем в игроке
-    local character = LocalPlayer.Character
-    if character then
-        for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") then
-                for _, child in ipairs(tool:GetDescendants()) do
-                    if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                        local name = child.Name:lower()
-                        if name:find("shoot") or name:find("fire") or name:find("gun") or name:find("bullet") then
-                            return child
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Ищем в PlayerGui
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        for _, child in ipairs(playerGui:GetDescendants()) do
-            if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                local name = child.Name:lower()
-                if name:find("shoot") or name:find("fire") or name:find("gun") or name:find("bullet") then
-                    return child
-                end
-            end
-        end
-    end
-    
-    return nil
-end
-
--- Основная функция Silent Aim
-local function ProcessSilentShot(remote, ...)
+-- Функция для обработки выстрела
+local function ProcessGunBeam(remote, ...)
     if not Config.Enabled then
-        -- Если Silent Aim выключен, вызываем оригинал
-        if remote:IsA("RemoteEvent") and originalFireServer then
+        -- Если выключен, вызываем оригинал
+        if originalFireServer then
             return originalFireServer(remote, ...)
-        elseif remote:IsA("RemoteFunction") and originalInvokeServer then
-            return originalInvokeServer(remote, ...)
         end
         return
     end
     
     local murderer = FindMurderer()
     if not murderer then
-        -- Если убийца не найден, стреляем как обычно
-        if remote:IsA("RemoteEvent") and originalFireServer then
+        if originalFireServer then
             return originalFireServer(remote, ...)
-        elseif remote:IsA("RemoteFunction") and originalInvokeServer then
-            return originalInvokeServer(remote, ...)
         end
         return
     end
     
-    -- Получаем позицию цели
     local targetPos = GetTargetPosition(murderer)
     if not targetPos then
-        if remote:IsA("RemoteEvent") and originalFireServer then
+        if originalFireServer then
             return originalFireServer(remote, ...)
-        elseif remote:IsA("RemoteFunction") and originalInvokeServer then
-            return originalInvokeServer(remote, ...)
         end
         return
     end
     
-    -- Меняем аргументы выстрела
+    -- Получаем аргументы
     local args = {...}
-    local modified = false
     
-    -- Пытаемся найти позицию или CFrame в аргументах и заменить на цель
+    -- Для GunBeam обычно передаются: (player, position, something)
+    -- Заменяем позицию на цель
     for i, arg in ipairs(args) do
-        if typeof(arg) == "CFrame" then
-            -- Заменяем CFrame на направление к цели
+        if typeof(arg) == "Vector3" then
+            args[i] = targetPos
+        elseif typeof(arg) == "CFrame" then
             local camera = workspace.CurrentCamera
             if camera then
                 args[i] = CFrame.lookAt(camera.CFrame.Position, targetPos)
-                modified = true
             end
-        elseif typeof(arg) == "Vector3" then
-            -- Заменяем позицию на цель
-            args[i] = targetPos
-            modified = true
         elseif type(arg) == "table" then
-            -- Проверяем таблицу на наличие позиции
             if arg.Position then
                 arg.Position = targetPos
-                modified = true
             end
-            if arg.CFrame then
-                local camera = workspace.CurrentCamera
-                if camera then
-                    arg.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
-                    modified = true
-                end
-            end
-        end
-    end
-    
-    -- Если ничего не изменилось, добавляем позицию цели
-    if not modified then
-        local camera = workspace.CurrentCamera
-        if camera then
-            table.insert(args, CFrame.lookAt(camera.CFrame.Position, targetPos))
         end
     end
     
     -- Вызываем оригинал с измененными аргументами
-    if remote:IsA("RemoteEvent") and originalFireServer then
+    if originalFireServer then
         return originalFireServer(remote, unpack(args))
-    elseif remote:IsA("RemoteFunction") and originalInvokeServer then
-        return originalInvokeServer(remote, unpack(args))
     end
 end
 
--- ==============================================
--- ПЕРЕХВАТ REMOTE
--- ==============================================
-
-local function HookRemote()
-    local remote = FindShootRemote()
-    if not remote then 
-        print("⚠️ Remote для выстрела не найден, пробуем другие методы...")
-        return false 
+-- Перехватываем GunBeam
+if gunBeamRemote and gunBeamRemote:IsA("RemoteEvent") then
+    originalFireServer = gunBeamRemote.FireServer
+    gunBeamRemote.FireServer = function(self, ...)
+        return ProcessGunBeam(self, ...)
     end
-    
-    print("✅ Найден Remote: " .. remote.Name)
-    
-    if remote:IsA("RemoteEvent") then
-        originalFireServer = remote.FireServer
-        remote.FireServer = function(self, ...)
-            return ProcessSilentShot(self, ...)
-        end
-    elseif remote:IsA("RemoteFunction") then
-        originalInvokeServer = remote.InvokeServer
-        remote.InvokeServer = function(self, ...)
-            return ProcessSilentShot(self, ...)
-        end
-    end
-    
-    return true
+    print("✅ GunBeam перехвачен")
 end
 
 -- ==============================================
--- МЕТОД ЧЕРЕЗ MOUSE
+-- АЛЬТЕРНАТИВНЫЙ МЕТОД ЧЕРЕЗ MOUSE
 -- ==============================================
 
 local function HookMouse()
     local mouse = LocalPlayer:GetMouse()
     if not mouse then return end
     
-    -- Сохраняем оригинальные методы
     local originalButton1Down = mouse.Button1Down
-    local originalButton1Up = mouse.Button1Up
     
     mouse.Button1Down = function(...)
         if Config.Enabled then
             local murderer = FindMurderer()
-            if murderer then
-                -- Пытаемся найти и использовать Remote
-                local remote = FindShootRemote()
-                if remote then
-                    if remote:IsA("RemoteEvent") then
-                        pcall(function()
-                            remote:FireServer(CFrame.lookAt(workspace.CurrentCamera.CFrame.Position, GetTargetPosition(murderer)))
-                        end)
-                    end
+            if murderer and gunBeamRemote then
+                local targetPos = GetTargetPosition(murderer)
+                if targetPos then
+                    pcall(function()
+                        -- Пробуем разные варианты аргументов
+                        gunBeamRemote:FireServer(targetPos)
+                        gunBeamRemote:FireServer(LocalPlayer, targetPos)
+                        gunBeamRemote:FireServer(LocalPlayer.Name, targetPos)
+                    end)
+                    return
                 end
-                return
             end
         end
         if originalButton1Down then
             return originalButton1Down(...)
         end
     end
-    
-    return true
 end
 
--- ==============================================
--- ЗАПУСК
--- ==============================================
-
--- Пробуем перехватить Remote
-local hooked = HookRemote()
-
--- Если Remote не найден, используем Mouse метод
-if not hooked then
-    task.wait(1)
-    HookMouse()
-end
+-- Запускаем
+task.wait(0.5)
+HookMouse()
 
 -- Перехват при появлении персонажа
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(1)
-    HookRemote()
+    HookMouse()
 end)
 
 -- ==============================================
@@ -414,17 +292,16 @@ end)
 print("═══════════════════════════════════")
 print("  🔪 SILENT AIM для MM2 (ИСПРАВЛЕННЫЙ)")
 print("═══════════════════════════════════")
-print("  🎯 Наводится ТОЛЬКО на убийцу")
+print("  🎯 Перехвачен Remote: GunBeam")
 print("  🔫 Стреляйте куда угодно - пуля попадет в убийцу")
 print("  🖱️  Кнопка на экране - Вкл/Выкл")
 print("  ⌨️  Клавиша S - Вкл/Выкл")
 print("═══════════════════════════════════")
 print("  🔧 Команды:")
 print("  • _G.ToggleSilentAim() - вкл/выкл")
-print("  • _G.SilentAimConfig - настройки")
 print("═══════════════════════════════════")
 
 _G.ToggleSilentAim = ToggleSilentAim
 _G.SilentAimConfig = Config
 
-print("✅ Скрипт загружен! Нажмите S или кнопку на экране для включения")
+print("✅ Скрипт загружен! Нажмите S или кнопку на экране")
