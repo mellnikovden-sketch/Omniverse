@@ -1,330 +1,255 @@
--- Silent Aim для MM2 (ТЕЛЕФОН)
--- Работает через нажатие на экран
-
+-- =============================
+-- MM2 AUTO SHOOT MURDERER
+-- =============================
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- ==============================================
--- НАСТРОЙКИ
--- ==============================================
-local Config = {
-    Enabled = false,
-    TargetPart = "HumanoidRootPart",
-    Prediction = 0.2,
-}
+local shootEnabled = false
+local gun = nil
 
--- ==============================================
--- ПОИСК УБИЙЦЫ
--- ==============================================
-
-local function IsMurderer(player)
-    if not player or not player.Character then return false end
+-- Функция для поиска убийцы
+local function findMurderer()
+    local character = LocalPlayer.Character
+    if not character then return nil end
     
-    local character = player.Character
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return false end
+    local closestMurderer = nil
+    local closestDistance = math.huge
     
-    local murdererWeapons = {
-        "knife", "blade", "dagger", "saw", "slasher", "axe", "scythe",
-        "peppermint", "cookie", "edge", "batwing", "icewing", "bone",
-        "hallow", "vampire", "cutter", "candy"
-    }
-    
-    for _, tool in ipairs(character:GetChildren()) do
-        if tool:IsA("Tool") then
-            local name = tool.Name:lower()
-            for _, wName in ipairs(murdererWeapons) do
-                if name:find(wName) or wName:find(name) then
-                    return true
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                -- Проверяем, является ли игрок убийцей (по наличию ножа)
+                local hasKnife = false
+                for _, child in ipairs(player.Character:GetChildren()) do
+                    if child:IsA("Tool") and (child.Name:lower():find("knife") or child.Name:lower():find("dagger") or child.Name:lower():find("blade")) then
+                        hasKnife = true
+                        break
+                    end
+                end
+                
+                if hasKnife then
+                    local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                    if rootPart then
+                        local distance = (character.HumanoidRootPart.Position - rootPart.Position).Magnitude
+                        if distance < closestDistance then
+                            closestDistance = distance
+                            closestMurderer = player
+                        end
+                    end
                 end
             end
         end
     end
     
-    if player:GetAttribute("Murderer") == true then
-        return true
-    end
-    
-    return false
+    return closestMurderer
 end
 
-local function FindMurderer()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and IsMurderer(player) then
-            return player
+-- Функция для получения оружия (пистолета)
+local function getGun()
+    local character = LocalPlayer.Character
+    if not character then return nil end
+    
+    for _, tool in ipairs(character:GetChildren()) do
+        if tool:IsA("Tool") and (tool.Name:lower():find("gun") or tool.Name:lower():find("pistol") or tool.Name:lower():find("revolver")) then
+            return tool
         end
     end
     return nil
 end
 
--- ==============================================
--- ПОЛУЧЕНИЕ ПОЗИЦИИ ЦЕЛИ
--- ==============================================
-
-local function GetTargetPosition(murderer)
-    if not murderer or not murderer.Character then return nil end
+-- Функция для стрельбы в убийцу
+local function shootMurderer()
+    if not shootEnabled then return end
     
-    local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart")
-    if not targetPart then 
-        targetPart = murderer.Character:FindFirstChild("Head")
-    end
-    if not targetPart then return nil end
+    local murderer = findMurderer()
+    if not murderer then return end
     
-    local vel = targetPart.AssemblyLinearVelocity or Vector3.new()
-    local predPos = targetPart.Position + (vel * Config.Prediction)
+    local character = LocalPlayer.Character
+    if not character then return end
     
-    return predPos
-end
-
--- ==============================================
--- ПОИСК REMOTE ДЛЯ ВЫСТРЕЛА
--- ==============================================
-
-local function FindShootRemote()
-    -- Ищем в ReplicatedStorage
-    local weaponEvents = ReplicatedStorage:FindFirstChild("WeaponEvents")
-    if weaponEvents then
-        for _, child in ipairs(weaponEvents:GetChildren()) do
-            if child:IsA("RemoteEvent") then
-                return child
+    local gun = getGun()
+    if not gun then
+        -- Если нет оружия, ищем в инвентаре
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") and (tool.Name:lower():find("gun") or tool.Name:lower():find("pistol") or tool.Name:lower():find("revolver")) then
+                    gun = tool
+                    break
+                end
             end
         end
     end
     
-    -- Ищем другие Remote
-    for _, child in ipairs(ReplicatedStorage:GetChildren()) do
-        if child:IsA("RemoteEvent") then
-            local name = child.Name:lower()
-            if name:find("shoot") or name:find("gun") or name:find("beam") or name:find("fire") then
-                return child
-            end
-        end
+    if not gun then
+        print("No gun found!")
+        return
     end
     
-    return nil
-end
-
-local shootRemote = FindShootRemote()
-if shootRemote then
-    print("✅ Найден Remote: " .. shootRemote.Name)
-else
-    print("⚠️ Remote не найден")
-end
-
--- ==============================================
--- СОЗДАНИЕ GUI (ДЛЯ ТЕЛЕФОНА)
--- ==============================================
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SilentAimMM2"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-
-local parent = gethui and gethui() or game:GetService("CoreGui")
-screenGui.Parent = parent
-
--- Кнопка (увеличил для телефона)
-local button = Instance.new("ImageButton")
-button.Name = "ToggleButton"
-button.Size = UDim2.new(0, 80, 0, 80)
-button.Position = UDim2.new(0.85, 0, 0.85, 0)
-button.AnchorPoint = Vector2.new(0.5, 0.5)
-button.BackgroundTransparency = 1
-button.Image = "rbxassetid://86221076925479"
-button.Parent = screenGui
-
--- Текст
-local text = Instance.new("TextLabel")
-text.Size = UDim2.new(1, 0, 1, 0)
-text.BackgroundTransparency = 1
-text.Text = "SA:OFF"
-text.TextColor3 = Color3.fromRGB(255, 255, 255)
-text.TextSize = 16
-text.Font = Enum.Font.Jura
-text.Parent = button
-
--- Обводка
-local stroke = Instance.new("UIGradient", button)
-stroke.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 0, 0))
-})
-
--- ==============================================
--- УПРАВЛЕНИЕ
--- ==============================================
-
-local function UpdateButton()
-    if text then
-        text.Text = Config.Enabled and "SA:ON" or "SA:OFF"
-        text.TextColor3 = Config.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-    end
-    if stroke then
-        stroke.Color = Config.Enabled and ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 0))
-        }) or ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 0, 0))
-        })
-    end
-end
-
-local function ToggleSilentAim()
-    Config.Enabled = not Config.Enabled
-    UpdateButton()
-    print("🎯 Silent Aim: " .. (Config.Enabled and "ВКЛЮЧЕН" or "ВЫКЛЮЧЕН"))
-    if Config.Enabled then
-        local murderer = FindMurderer()
-        if murderer then
-            print("🔪 Убийца: " .. murderer.Name)
-        else
-            print("❌ Убийца не найден")
-        end
-    end
-end
-
--- ==============================================
--- ПОДКЛЮЧЕНИЕ КНОПКИ (ДЛЯ ТЕЛЕФОНА)
--- ==============================================
-
-button.MouseButton1Click:Connect(ToggleSilentAim)
-button.TouchTap:Connect(ToggleSilentAim)
-
--- Клавиша S (для клавиатуры если есть)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.S then
-        ToggleSilentAim()
-    end
-end)
-
--- ==============================================
--- ОСНОВНАЯ ЛОГИКА SILENT AIM (ДЛЯ ТЕЛЕФОНА)
--- ==============================================
-
--- Функция выстрела в убийцу
-local function ShootMurderer()
-    if not Config.Enabled then return end
-    if not shootRemote then return end
-    
-    local murderer = FindMurderer()
-    if not murderer then 
-        print("❌ Убийца не найден")
-        return 
+    -- Экипируем оружие, если оно в рюкзаке
+    if gun.Parent ~= character then
+        gun.Parent = character
+        task.wait(0.1)
     end
     
-    local targetPos = GetTargetPosition(murderer)
-    if not targetPos then return end
+    local murdererRoot = murderer.Character:FindFirstChild("HumanoidRootPart")
+    if not murdererRoot then return end
     
-    -- Пробуем разные варианты вызова
-    local success = false
-    
-    -- Вариант 1: просто позиция
-    success = pcall(function()
-        shootRemote:FireServer(targetPos)
-    end)
-    
-    if not success then
-        -- Вариант 2: с игроком
-        success = pcall(function()
-            shootRemote:FireServer(LocalPlayer, targetPos)
-        end)
+    -- Активируем оружие
+    local activate = gun:FindFirstChild("Activate")
+    if not activate then
+        activate = gun:FindFirstChild("RemoteEvent")
     end
     
-    if not success then
-        -- Вариант 3: с CFrame
-        success = pcall(function()
-            local camera = workspace.CurrentCamera
-            if camera then
-                shootRemote:FireServer(CFrame.lookAt(camera.CFrame.Position, targetPos))
-            end
-        end)
-    end
-    
-    if not success then
-        -- Вариант 4: с именем
-        success = pcall(function()
-            shootRemote:FireServer(LocalPlayer.Name, targetPos)
-        end)
-    end
-    
-    if success then
-        print("🔫 Выстрел в убийцу!")
-    else
-        print("❌ Не удалось выстрелить")
-    end
-end
-
--- ==============================================
--- ПЕРЕХВАТ НАЖАТИЯ НА ЭКРАН (ДЛЯ ТЕЛЕФОНА)
--- ==============================================
-
--- Перехватываем касания экрана
-UserInputService.TouchEnabled = true
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- Если это касание экрана
-    if input.UserInputType == Enum.UserInputType.Touch then
-        -- Проверяем что это не нажатие на кнопку
-        local guiObject = game:GetService("GuiService"):GetGuiObjectsAtPosition(input.Position)
-        local isButton = false
-        for _, obj in ipairs(guiObject) do
-            if obj == button then
-                isButton = true
-                break
-            end
+    if activate then
+        -- Наводимся на убийцу
+        local camera = workspace.CurrentCamera
+        if camera then
+            local targetPosition = murdererRoot.Position + Vector3.new(0, 1.5, 0) -- Целимся в голову/тело
+            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPosition)
         end
         
-        if not isButton then
-            -- Это выстрел!
-            task.wait(0.05) -- небольшая задержка
-            ShootMurderer()
+        task.wait(0.05)
+        
+        -- Стреляем
+        if activate:IsA("RemoteEvent") then
+            activate:FireServer()
+        elseif activate:IsA("BindableEvent") then
+            activate:Fire()
+        elseif typeof(activate) == "function" then
+            activate()
+        end
+        
+        print("Shot at: " .. murderer.Name)
+    else
+        -- Альтернативный способ стрельбы
+        local remote = gun:FindFirstChild("RemoteEvent")
+        if remote then
+            remote:FireServer("Shoot")
+        end
+        
+        -- Пытаемся использовать через ClickDetector
+        local clickDetector = gun:FindFirstChild("ClickDetector")
+        if clickDetector then
+            clickDetector:Click()
+        end
+    end
+end
+
+-- Функция для непрерывной стрельбы
+local shooting = false
+local shootCoroutine = nil
+
+local function startAutoShoot()
+    if shootCoroutine then
+        coroutine.close(shootCoroutine)
+        shootCoroutine = nil
+    end
+    
+    shootCoroutine = coroutine.create(function()
+        while shooting and shootEnabled do
+            shootMurderer()
+            task.wait(0.3) -- Задержка между выстрелами
+        end
+    end)
+    coroutine.resume(shootCoroutine)
+end
+
+-- Создаем GUI для управления
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MM2ShootGUI"
+screenGui.Parent = LocalPlayer.PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0.5, -100, 0.5, -50)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Visible = true
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 180, 0, 40)
+toggleButton.Position = UDim2.new(0.5, -90, 0.3, 0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 18
+toggleButton.Text = "Enable Auto Shoot"
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.BorderSizePixel = 0
+toggleButton.Parent = frame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 180, 0, 30)
+statusLabel.Position = UDim2.new(0.5, -90, 0.7, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.TextSize = 16
+statusLabel.Text = "Status: Disabled"
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Parent = frame
+
+local shootButton = Instance.new("TextButton")
+shootButton.Size = UDim2.new(0, 180, 0, 30)
+shootButton.Position = UDim2.new(0.5, -90, -0.1, 0)
+shootButton.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+shootButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+shootButton.TextSize = 16
+shootButton.Text = "🔫 Shoot Murderer (Key: X)"
+shootButton.Font = Enum.Font.GothamBold
+shootButton.BorderSizePixel = 0
+shootButton.Parent = frame
+
+toggleButton.MouseButton1Click:Connect(function()
+    shootEnabled = not shootEnabled
+    
+    if shootEnabled then
+        toggleButton.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
+        toggleButton.Text = "Disable Auto Shoot"
+        statusLabel.Text = "Status: Enabled 🟢"
+        shooting = true
+        startAutoShoot()
+    else
+        toggleButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        toggleButton.Text = "Enable Auto Shoot"
+        statusLabel.Text = "Status: Disabled 🔴"
+        shooting = false
+        if shootCoroutine then
+            coroutine.close(shootCoroutine)
+            shootCoroutine = nil
         end
     end
 end)
 
--- ==============================================
--- АВТОМАТИЧЕСКИЙ ПОИСК УБИЙЦЫ
--- ==============================================
-
--- Обновляем поиск убийцы каждые 2 секунды
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if Config.Enabled then
-            local murderer = FindMurderer()
-            if murderer then
-                print("🔪 Убийца: " .. murderer.Name)
-            end
-        end
+shootButton.MouseButton1Click:Connect(function()
+    if not shootEnabled then
+        shootMurderer()
     end
 end)
 
--- ==============================================
--- ИНФОРМАЦИЯ
--- ==============================================
+-- Keybind для стрельбы (X)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X then
+        shootMurderer()
+    end
+end)
 
-print("═══════════════════════════════════")
-print("  📱 SILENT AIM для MM2 (ТЕЛЕФОН)")
-print("═══════════════════════════════════")
-print("  🎯 Наводится на убийцу")
-print("  🔫 Нажмите на экран для выстрела")
-print("  🖱️  Кнопка внизу справа - Вкл/Выкл")
-print("═══════════════════════════════════")
-print("  📌 Как использовать:")
-print("  1. Нажмите кнопку SA:OFF")
-print("  2. Она станет зеленой - SA:ON")
-print("  3. Нажимайте на экран")
-print("  4. Пуля полетит в убийцу!")
-print("═══════════════════════════════════")
+-- Добавляем информацию
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(0, 200, 0, 20)
+infoLabel.Position = UDim2.new(0, 0, 1.4, 0)
+infoLabel.BackgroundTransparency = 1
+infoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+infoLabel.TextSize = 12
+infoLabel.Text = "Press X to shoot | Auto shoots at murderer"
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.Parent = frame
 
-_G.ToggleSilentAim = ToggleSilentAim
-_G.SilentAimConfig = Config
-
-print("✅ Готово! Нажмите кнопку на экране")
+print("MM2 Auto Shoot loaded! Press X to shoot or use the GUI")
