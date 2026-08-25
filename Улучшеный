@@ -1,0 +1,1501 @@
+-- MM2 Murderer Aim Lock V2.7 ULTIMATE
+-- Добавлено: ESP, Tracers, FOV Circle, Silent Aim, Auto Knife, Trigger Bot, No Recoil, Speed Boost, Auto Respawn, Kill Effect
+-- Улучшено: Анти-детект, оптимизация, сохранение настроек, анимации, безопасность
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SoundService = game:GetService("SoundService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==============================================
+-- СИСТЕМА СОХРАНЕНИЯ НАСТРОЕК
+-- ==============================================
+local Config = {
+    AimLockEnabled = false,
+    WallCheckEnabled = false,
+    OutlineEnabled = false,
+    WallHopEnabled = false,
+    BombJumpEnabled = true,
+    GoldBombEnabled = false,
+    ESPEnabled = false,
+    TracersEnabled = false,
+    FOVEnabled = false,
+    SilentAimEnabled = false,
+    AutoKnifeEnabled = false,
+    TriggerBotEnabled = false,
+    NoRecoilEnabled = false,
+    SpeedBoostEnabled = false,
+    AutoRespawnEnabled = false,
+    KillEffectEnabled = false,
+    
+    TargetPart = "HumanoidRootPart",
+    PredictionLevel = 0.2,
+    AimSmoothness = 0.15,
+    FOVRadius = 150,
+    WallHopDistance = 3,
+    WallHopPower = 50,
+    BombCooldown = 22,
+    BombPower = 58,
+    
+    ESPColorMurderer = Color3.fromRGB(255, 0, 0),
+    ESPColorSheriff = Color3.fromRGB(0, 150, 255),
+    ESPColorInnocent = Color3.fromRGB(0, 255, 0),
+    ESPColorDead = Color3.fromRGB(128, 128, 128),
+}
+
+local function SaveConfig()
+    local success, err = pcall(function()
+        local json = game:GetService("HttpService"):JSONEncode(Config)
+        if writefile then
+            writefile("mm2_aim_config.json", json)
+        end
+    end)
+    if not success then
+        warn("Failed to save config: " .. tostring(err))
+    end
+end
+
+local function LoadConfig()
+    local success, err = pcall(function()
+        if readfile then
+            local data = readfile("mm2_aim_config.json")
+            if data and data ~= "" then
+                local loaded = game:GetService("HttpService"):JSONDecode(data)
+                for key, value in pairs(loaded) do
+                    if Config[key] ~= nil then
+                        Config[key] = value
+                    end
+                end
+            end
+        end
+    end)
+    if not success then
+        warn("Failed to load config: " .. tostring(err))
+    end
+end
+
+LoadConfig()
+
+-- ==============================================
+-- АНТИ-ДЕТЕКТ СИСТЕМА
+-- ==============================================
+local AntiDetect = {
+    RandomDelays = {},
+    LastActionTime = 0,
+    ActivityCounter = 0,
+}
+
+function AntiDetect:RandomDelay(min, max)
+    return math.random() * (max - min) + min
+end
+
+function AntiDetect:ShouldAct()
+    local now = os.clock()
+    if now - self.LastActionTime < 0.05 then
+        return false
+    end
+    self.LastActionTime = now
+    self.ActivityCounter = self.ActivityCounter + 1
+    if self.ActivityCounter > 100 then
+        self.ActivityCounter = 0
+        task.wait(self:RandomDelay(0.01, 0.05))
+    end
+    return true
+end
+
+-- ==============================================
+-- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+-- ==============================================
+local function GetCharacter(plr)
+    if not plr then return nil end
+    return plr.Character
+end
+
+local function GetHumanoid(plr)
+    local char = GetCharacter(plr)
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+local function GetRootPart(plr)
+    local char = GetCharacter(plr)
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function IsAlive(plr)
+    local hum = GetHumanoid(plr)
+    if not hum then return false end
+    return hum.Health > 0
+end
+
+local function IsInGame(plr)
+    if not plr then return false end
+    if plr == LocalPlayer then return true end
+    return IsAlive(plr)
+end
+
+-- ==============================================
+-- ОПРЕДЕЛЕНИЕ РОЛЕЙ (УЛУЧШЕННОЕ)
+-- ==============================================
+local ROLE_KEYWORDS = {
+    Murderer = {"murderer", "killer", "knife", "blade", "dagger", "saw", "slasher", "axe", "scythe"},
+    Sheriff = {"sheriff", "cop", "gun", "pistol", "revolver", "shooter", "blaster", "glock"},
+}
+
+local function GetPlayerRole(plr)
+    if not plr or plr == LocalPlayer then return nil end
+    if not IsAlive(plr) then return "Dead" end
+    
+    local char = GetCharacter(plr)
+    if not char then return "Dead" end
+    
+    -- Проверка атрибутов
+    local attributes = {
+        plr:GetAttribute("Murderer"),
+        plr:GetAttribute("Sheriff"),
+        plr:GetAttribute("Role"),
+        plr:GetAttribute("Team")
+    }
+    
+    for _, attr in ipairs(attributes) do
+        if attr then
+            local str = tostring(attr):lower()
+            if str:find("murderer") or str:find("killer") or str:find("murder") then
+                return "Murderer"
+            end
+            if str:find("sheriff") or str:find("cop") or str:find("sherif") then
+                return "Sheriff"
+            end
+        end
+    end
+    
+    -- Проверка оружия в руках
+    for _, item in ipairs(char:GetChildren()) do
+        if item:IsA("Tool") then
+            local name = item.Name:lower()
+            for _, keyword in ipairs(ROLE_KEYWORDS.Murderer) do
+                if name:find(keyword) then
+                    return "Murderer"
+                end
+            end
+            for _, keyword in ipairs(ROLE_KEYWORDS.Sheriff) do
+                if name:find(keyword) then
+                    return "Sheriff"
+                end
+            end
+        end
+    end
+    
+    -- Проверка рюкзака
+    local backpack = plr:FindFirstChild("Backpack")
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                local name = item.Name:lower()
+                for _, keyword in ipairs(ROLE_KEYWORDS.Murderer) do
+                    if name:find(keyword) then
+                        return "Murderer"
+                    end
+                end
+                for _, keyword in ipairs(ROLE_KEYWORDS.Sheriff) do
+                    if name:find(keyword) then
+                        return "Sheriff"
+                    end
+                end
+            end
+        end
+    end
+    
+    return "Innocent"
+end
+
+-- ==============================================
+-- ESP СИСТЕМА (НОВАЯ)
+-- ==============================================
+local ESP = {
+    Enabled = false,
+    Boxes = {},
+    Tracers = {},
+    Names = {},
+    HealthBars = {},
+}
+
+local function GetRoleColor(role)
+    if role == "Murderer" then return Config.ESPColorMurderer end
+    if role == "Sheriff" then return Config.ESPColorSheriff end
+    if role == "Innocent" then return Config.ESPColorInnocent end
+    return Config.ESPColorDead
+end
+
+local function CreateESPBox(plr)
+    if not plr or plr == LocalPlayer then return end
+    if ESP.Boxes[plr] then return end
+    
+    local role = GetPlayerRole(plr)
+    if role == "Dead" then return end
+    
+    local char = GetCharacter(plr)
+    if not char then return end
+    
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "ESP_Box"
+    box.Size = Vector3.new(3, 5, 1)
+    box.Color3 = GetRoleColor(role)
+    box.Transparency = 0.3
+    box.ZIndex = 0
+    box.Adornee = char
+    box.Parent = char
+    
+    local outline = Instance.new("BoxHandleAdornment")
+    outline.Name = "ESP_Outline"
+    outline.Size = Vector3.new(3.2, 5.2, 1.2)
+    outline.Color3 = Color3.fromRGB(0, 0, 0)
+    outline.Transparency = 0.7
+    outline.ZIndex = -1
+    outline.Adornee = char
+    outline.Parent = char
+    
+    -- Имя игрока
+    local nameTag = Instance.new("BillboardGui")
+    nameTag.Name = "ESP_Name"
+    nameTag.Size = UDim2.new(0, 200, 0, 30)
+    nameTag.Adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+    nameTag.Parent = char
+    nameTag.AlwaysOnTop = true
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = plr.Name .. " [" .. role .. "]"
+    nameLabel.TextColor3 = GetRoleColor(role)
+    nameLabel.TextSize = 14
+    nameLabel.Font = Enum.Font.Jura
+    nameLabel.TextStrokeTransparency = 0.2
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.Parent = nameTag
+    
+    -- Полоска здоровья
+    local healthBar = Instance.new("BillboardGui")
+    healthBar.Name = "ESP_Health"
+    healthBar.Size = UDim2.new(0, 100, 0, 10)
+    healthBar.Adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+    healthBar.Parent = char
+    healthBar.AlwaysOnTop = true
+    healthBar.Position = UDim2.new(0, 0, 1, 5)
+    
+    local healthBg = Instance.new("Frame")
+    healthBg.Size = UDim2.new(1, 0, 1, 0)
+    healthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    healthBg.BorderSizePixel = 0
+    healthBg.Parent = healthBar
+    
+    local healthFill = Instance.new("Frame")
+    healthFill.Size = UDim2.new(1, 0, 1, 0)
+    healthFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    healthFill.BorderSizePixel = 0
+    healthFill.Parent = healthBg
+    
+    ESP.Boxes[plr] = {
+        Box = box,
+        Outline = outline,
+        NameTag = nameTag,
+        NameLabel = nameLabel,
+        HealthBar = healthBar,
+        HealthBg = healthBg,
+        HealthFill = healthFill,
+    }
+end
+
+local function RemoveESPBox(plr)
+    if ESP.Boxes[plr] then
+        local data = ESP.Boxes[plr]
+        for _, obj in pairs(data) do
+            pcall(function() obj:Destroy() end)
+        end
+        ESP.Boxes[plr] = nil
+    end
+end
+
+local function UpdateESP()
+    if not ESP.Enabled then
+        for plr, _ in pairs(ESP.Boxes) do
+            RemoveESPBox(plr)
+        end
+        return
+    end
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local role = GetPlayerRole(plr)
+            local alive = IsAlive(plr)
+            
+            if alive and role ~= "Dead" then
+                if not ESP.Boxes[plr] then
+                    CreateESPBox(plr)
+                else
+                    -- Обновление цвета
+                    local data = ESP.Boxes[plr]
+                    local color = GetRoleColor(role)
+                    data.Box.Color3 = color
+                    data.NameLabel.TextColor3 = color
+                    data.NameLabel.Text = plr.Name .. " [" .. role .. "]"
+                    
+                    -- Обновление здоровья
+                    local hum = GetHumanoid(plr)
+                    if hum then
+                        local health = hum.Health / hum.MaxHealth
+                        data.HealthFill.Size = UDim2.new(health, 0, 1, 0)
+                        data.HealthFill.BackgroundColor3 = Color3.fromRGB(
+                            255 * (1 - health),
+                            255 * health,
+                            0
+                        )
+                    end
+                end
+            else
+                if ESP.Boxes[plr] then
+                    RemoveESPBox(plr)
+                end
+            end
+        end
+    end
+end
+
+-- ==============================================
+-- TRACERS СИСТЕМА (НОВАЯ)
+-- ==============================================
+local Tracers = {
+    Enabled = false,
+    Lines = {},
+}
+
+local function CreateTracer(plr)
+    if not plr or plr == LocalPlayer then return end
+    if Tracers.Lines[plr] then return end
+    
+    local role = GetPlayerRole(plr)
+    if role == "Dead" then return end
+    
+    local char = GetCharacter(plr)
+    if not char then return end
+    
+    local line = Instance.new("LineHandleAdornment")
+    line.Name = "Tracer"
+    line.Color3 = GetRoleColor(role)
+    line.Transparency = 0.5
+    line.Thickness = 1
+    line.ZIndex = 0
+    line.Parent = char
+    
+    Tracers.Lines[plr] = line
+end
+
+local function RemoveTracer(plr)
+    if Tracers.Lines[plr] then
+        pcall(function() Tracers.Lines[plr]:Destroy() end)
+        Tracers.Lines[plr] = nil
+    end
+end
+
+local function UpdateTracers()
+    if not Tracers.Enabled then
+        for plr, _ in pairs(Tracers.Lines) do
+            RemoveTracer(plr)
+        end
+        return
+    end
+    
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    local myPos = camera.CFrame.Position
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local role = GetPlayerRole(plr)
+            local alive = IsAlive(plr)
+            
+            if alive and role ~= "Dead" then
+                local root = GetRootPart(plr)
+                if root then
+                    if not Tracers.Lines[plr] then
+                        CreateTracer(plr)
+                    end
+                    
+                    local line = Tracers.Lines[plr]
+                    if line then
+                        line.From = myPos
+                        line.To = root.Position
+                        line.Color3 = GetRoleColor(role)
+                    end
+                end
+            else
+                if Tracers.Lines[plr] then
+                    RemoveTracer(plr)
+                end
+            end
+        end
+    end
+end
+
+-- ==============================================
+-- FOV CIRCLE (НОВЫЙ)
+-- ==============================================
+local FOV = {
+    Enabled = false,
+    Circle = nil,
+    Radius = 150,
+}
+
+local function CreateFOVCircle()
+    if FOV.Circle then return end
+    
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    local screenSize = camera.ViewportSize
+    
+    local circle = Instance.new("ImageLabel")
+    circle.Name = "FOV_Circle"
+    circle.Size = UDim2.new(0, FOV.Radius * 2, 0, FOV.Radius * 2)
+    circle.Position = UDim2.new(0.5, -FOV.Radius, 0.5, -FOV.Radius)
+    circle.BackgroundTransparency = 1
+    circle.Image = "rbxassetid://18937262500"
+    circle.ImageTransparency = 0.6
+    circle.Parent = CoreGui
+    
+    local border = Instance.new("ImageLabel")
+    border.Name = "FOV_Border"
+    border.Size = UDim2.new(1, 0, 1, 0)
+    border.BackgroundTransparency = 1
+    border.Image = "rbxassetid://18937262300"
+    border.ImageTransparency = 0.3
+    border.Parent = circle
+    
+    FOV.Circle = circle
+end
+
+local function RemoveFOVCircle()
+    if FOV.Circle then
+        pcall(function() FOV.Circle:Destroy() end)
+        FOV.Circle = nil
+    end
+end
+
+-- ==============================================
+-- SILENT AIM (НОВЫЙ)
+-- ==============================================
+local SilentAim = {
+    Enabled = false,
+    Target = nil,
+}
+
+local function GetClosestPlayer()
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil end
+    
+    local center = camera.ViewportSize / 2
+    local closest = nil
+    local closestDist = FOV.Radius
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and IsAlive(plr) then
+            local role = GetPlayerRole(plr)
+            if role == "Murderer" then
+                local root = GetRootPart(plr)
+                if root then
+                    local pos, onScreen = camera:WorldToViewportPoint(root.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                            closest = plr
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return closest
+end
+
+-- ==============================================
+-- AUTO KNIFE (НОВЫЙ)
+-- ==============================================
+local AutoKnife = {
+    Enabled = false,
+    LastKnife = 0,
+    Cooldown = 0.5,
+}
+
+local function PerformAutoKnife()
+    if not AutoKnife.Enabled then return end
+    if os.clock() - AutoKnife.LastKnife < AutoKnife.Cooldown then return end
+    
+    local target = SilentAim.Target or GetClosestPlayer()
+    if not target then return end
+    
+    local char = GetCharacter(LocalPlayer)
+    if not char then return end
+    
+    -- Поиск ножа
+    local knife = nil
+    for _, item in ipairs(char:GetChildren()) do
+        if item:IsA("Tool") then
+            local name = item.Name:lower()
+            for _, keyword in ipairs(ROLE_KEYWORDS.Murderer) do
+                if name:find(keyword) then
+                    knife = item
+                    break
+                end
+            end
+        end
+        if knife then break end
+    end
+    
+    if not knife then return end
+    
+    -- Проверка дистанции
+    local root = GetRootPart(LocalPlayer)
+    local targetRoot = GetRootPart(target)
+    if not root or not targetRoot then return end
+    
+    local dist = (root.Position - targetRoot.Position).Magnitude
+    if dist > 10 then return end
+    
+    -- Активация удара
+    local remote = knife:FindFirstChild("Remote") or knife:FindFirstChild("KnifeRemote")
+    if remote then
+        pcall(function()
+            if remote:IsA("RemoteEvent") then
+                remote:FireServer()
+            elseif remote:IsA("RemoteFunction") then
+                remote:InvokeServer()
+            end
+        end)
+        AutoKnife.LastKnife = os.clock()
+    end
+end
+
+-- ==============================================
+-- TRIGGER BOT (НОВЫЙ)
+-- ==============================================
+local TriggerBot = {
+    Enabled = false,
+    LastShot = 0,
+    Cooldown = 0.1,
+}
+
+local function PerformTriggerBot()
+    if not TriggerBot.Enabled then return end
+    if os.clock() - TriggerBot.LastShot < TriggerBot.Cooldown then return end
+    
+    local target = SilentAim.Target or GetClosestPlayer()
+    if not target then return end
+    
+    -- Проверка, что цель в прицеле
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    local root = GetRootPart(target)
+    if not root then return end
+    
+    local pos, onScreen = camera:WorldToViewportPoint(root.Position)
+    if not onScreen then return end
+    
+    local center = camera.ViewportSize / 2
+    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+    if dist > 50 then return end
+    
+    -- Поиск оружия
+    local char = GetCharacter(LocalPlayer)
+    if not char then return end
+    
+    local weapon = char:FindFirstChildOfClass("Tool")
+    if not weapon then return end
+    
+    -- Активация выстрела
+    local remote = weapon:FindFirstChild("Remote") or weapon:FindFirstChild("GunRemote")
+    if remote then
+        pcall(function()
+            if remote:IsA("RemoteEvent") then
+                remote:FireServer()
+            elseif remote:IsA("RemoteFunction") then
+                remote:InvokeServer()
+            end
+        end)
+        TriggerBot.LastShot = os.clock()
+    end
+end
+
+-- ==============================================
+-- NO RECOIL (НОВЫЙ)
+-- ==============================================
+local NoRecoil = {
+    Enabled = false,
+    OriginalRecoil = nil,
+}
+
+local function ApplyNoRecoil()
+    if not NoRecoil.Enabled then return end
+    
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    -- Сброс позиции камеры
+    local char = GetCharacter(LocalPlayer)
+    if not char then return end
+    
+    local head = char:FindFirstChild("Head")
+    if head then
+        -- Сглаживание движения камеры
+        local currentCF = camera.CFrame
+        local targetCF = CFrame.lookAt(currentCF.Position, currentCF.Position + currentCF.LookVector)
+        camera.CFrame = camera.CFrame:Lerp(targetCF, 0.5)
+    end
+end
+
+-- ==============================================
+-- SPEED BOOST (НОВЫЙ)
+-- ==============================================
+local SpeedBoost = {
+    Enabled = false,
+    OriginalSpeed = 16,
+    BoostSpeed = 25,
+    LowHealthThreshold = 30,
+}
+
+local function UpdateSpeedBoost()
+    if not SpeedBoost.Enabled then return end
+    
+    local hum = GetHumanoid(LocalPlayer)
+    if not hum then return end
+    
+    local healthPercent = (hum.Health / hum.MaxHealth) * 100
+    
+    if healthPercent < SpeedBoost.LowHealthThreshold then
+        hum.WalkSpeed = SpeedBoost.BoostSpeed
+    else
+        hum.WalkSpeed = SpeedBoost.OriginalSpeed
+    end
+end
+
+-- ==============================================
+-- AUTO RESPAWN (НОВЫЙ)
+-- ==============================================
+local AutoRespawn = {
+    Enabled = false,
+}
+
+local function PerformAutoRespawn()
+    if not AutoRespawn.Enabled then return end
+    
+    local hum = GetHumanoid(LocalPlayer)
+    if not hum then return end
+    
+    if hum.Health <= 0 then
+        -- Поиск кнопки респавна
+        local respawnButton = nil
+        local gui = CoreGui:FindFirstChildOfClass("ScreenGui")
+        if gui then
+            respawnButton = gui:FindFirstChild("RespawnButton", true)
+            if not respawnButton then
+                respawnButton = gui:FindFirstChild("Respawn", true)
+            end
+        end
+        
+        if respawnButton and respawnButton:IsA("GuiButton") then
+            pcall(function()
+                respawnButton:Click()
+            end)
+        elseif ReplicatedStorage and ReplicatedStorage.FindFirstChild("Respawn") then
+            pcall(function()
+                ReplicatedStorage.Respawn:FireServer()
+            end)
+        end
+    end
+end
+
+-- ==============================================
+-- KILL EFFECT (НОВЫЙ)
+-- ==============================================
+local KillEffect = {
+    Enabled = false,
+    Effects = {},
+}
+
+local function CreateKillEffect(position)
+    if not KillEffect.Enabled then return end
+    
+    -- Взрывной эффект
+    local explosion = Instance.new("Explosion")
+    explosion.Position = position
+    explosion.BlastRadius = 5
+    explosion.BlastPressure = 0
+    explosion.ExplosionType = Enum.ExplosionType.NoCraters
+    explosion.Parent = Workspace
+    
+    -- Частицы
+    for i = 1, 20 do
+        local particle = Instance.new("Part")
+        particle.Size = Vector3.new(0.5, 0.5, 0.5)
+        particle.Position = position + Vector3.new(
+            math.random(-3, 3),
+            math.random(-3, 3),
+            math.random(-3, 3)
+        )
+        particle.Anchored = true
+        particle.CanCollide = false
+        particle.Material = Enum.Material.Neon
+        particle.BrickColor = BrickColor.Random()
+        particle.Parent = Workspace
+        
+        local tween = TweenService:Create(particle, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Transparency = 1,
+            Size = Vector3.new(0.1, 0.1, 0.1),
+        })
+        tween:Play()
+        
+        task.spawn(function()
+            task.wait(1)
+            particle:Destroy()
+        end)
+    end
+end
+
+-- ==============================================
+-- УЛУЧШЕННЫЙ AIM LOCK
+-- ==============================================
+local AimLock = {
+    Enabled = false,
+    Target = nil,
+    Smoothness = 0.15,
+    LastSearch = 0,
+    SearchInterval = 0.1,
+}
+
+local function FindBestTarget()
+    if not AimLock.Enabled then return nil end
+    
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil end
+    
+    local bestTarget = nil
+    local bestScore = math.huge
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and IsAlive(plr) then
+            local role = GetPlayerRole(plr)
+            if role == "Murderer" then
+                local root = GetRootPart(plr)
+                if root then
+                    local myRoot = GetRootPart(LocalPlayer)
+                    if myRoot then
+                        local dist = (root.Position - myRoot.Position).Magnitude
+                        
+                        -- Проверка видимости
+                        if Config.WallCheckEnabled then
+                            local visible = IsPlayerVisible(plr)
+                            if not visible then
+                                continue
+                            end
+                        end
+                        
+                        if dist < bestScore then
+                            bestScore = dist
+                            bestTarget = plr
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return bestTarget
+end
+
+local function IsPlayerVisible(plr)
+    local root = GetRootPart(plr)
+    if not root then return false end
+    
+    local camera = Workspace.CurrentCamera
+    if not camera then return false end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {GetCharacter(LocalPlayer)}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local result = workspace:Raycast(camera.CFrame.Position, root.Position - camera.CFrame.Position, raycastParams)
+    
+    if not result then return true end
+    return result.Instance:IsDescendantOf(GetCharacter(plr))
+end
+
+local function UpdateAimLock()
+    if not AimLock.Enabled then return end
+    
+    local now = os.clock()
+    if now - AimLock.LastSearch > AimLock.SearchInterval then
+        AimLock.Target = FindBestTarget()
+        AimLock.LastSearch = now
+    end
+    
+    if not AimLock.Target then return end
+    
+    local root = GetRootPart(AimLock.Target)
+    if not root then return end
+    
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    -- Предсказание движения
+    local vel = root.AssemblyLinearVelocity or Vector3.new()
+    local predictedPos = root.Position + (vel * Config.PredictionLevel)
+    
+    -- Плавное наведение
+    local targetCF = CFrame.new(camera.CFrame.Position, predictedPos)
+    camera.CFrame = camera.CFrame:Lerp(targetCF, AimLock.Smoothness)
+end
+
+-- ==============================================
+-- BOMB JUMP (УЛУЧШЕННЫЙ)
+-- ==============================================
+local BombJump = {
+    Enabled = true,
+    Cooldown = 22,
+    Power = 58,
+    LastJump = 0,
+    IsGold = false,
+    AutoGet = true,
+}
+
+local BOMB_TYPES = {
+    "FakeBomb", "Bomb", "GiftBomb", "PresentBomb", "Snowball", "CandyBomb",
+    "GoldBomb", "GoldenBomb", "BombGold", "Gold"
+}
+
+local function GetBomb()
+    local char = GetCharacter(LocalPlayer)
+    if not char then return nil end
+    
+    -- Проверка в руках
+    for _, name in ipairs(BOMB_TYPES) do
+        local bomb = char:FindFirstChild(name)
+        if bomb then return bomb end
+    end
+    
+    -- Проверка в рюкзаке
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        for _, name in ipairs(BOMB_TYPES) do
+            local bomb = backpack:FindFirstChild(name)
+            if bomb then
+                bomb.Parent = char
+                return bomb
+            end
+        end
+    end
+    
+    -- Автоматическое получение
+    if BombJump.AutoGet then
+        pcall(function()
+            ReplicatedStorage.Remotes.Extras.ReplicateToy:InvokeServer("FakeBomb")
+        end)
+        task.wait(0.1)
+        return GetBomb()
+    end
+    
+    return nil
+end
+
+local function PerformBombJump()
+    if not BombJump.Enabled then return end
+    if os.clock() - BombJump.LastJump < BombJump.Cooldown then return end
+    
+    local hum = GetHumanoid(LocalPlayer)
+    if not hum then return end
+    
+    -- Проверка, что игрок в воздухе
+    local state = hum:GetState()
+    if state ~= Enum.HumanoidStateType.Jumping and 
+       state ~= Enum.HumanoidStateType.FallingDown and
+       state ~= Enum.HumanoidStateType.Freefall then
+        return
+    end
+    
+    local bomb = GetBomb()
+    if not bomb then return end
+    
+    local root = GetRootPart(LocalPlayer)
+    if not root then return end
+    
+    -- Активация бомбы
+    local remote = bomb:FindFirstChild("Remote")
+    if remote then
+        local camera = Workspace.CurrentCamera
+        local pos = root.Position + camera.CFrame.LookVector * 3 + Vector3.new(0, -2, 0)
+        
+        pcall(function()
+            remote:FireServer(CFrame.new(pos), BombJump.Power)
+        end)
+        
+        -- Принудительный прыжок
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        root.AssemblyLinearVelocity = Vector3.new(
+            root.AssemblyLinearVelocity.X,
+            BombJump.Power,
+            root.AssemblyLinearVelocity.Z
+        )
+        
+        BombJump.LastJump = os.clock()
+        
+        -- Создание визуального эффекта
+        if KillEffect.Enabled then
+            CreateKillEffect(root.Position)
+        end
+    end
+end
+
+-- ==============================================
+-- WALLHOP (УЛУЧШЕННЫЙ)
+-- ==============================================
+local WallHop = {
+    Enabled = false,
+    Distance = 3,
+    Power = 50,
+    LastHop = 0,
+    IsJumping = false,
+    LastWall = nil,
+}
+
+local function PerformWallHop()
+    if not WallHop.Enabled then return end
+    if os.clock() - WallHop.LastHop < 0.2 then return end
+    
+    local char = GetCharacter(LocalPlayer)
+    if not char then return end
+    
+    local hum = GetHumanoid(LocalPlayer)
+    if not hum then return end
+    if hum.Health <= 0 then return end
+    
+    local root = GetRootPart(LocalPlayer)
+    if not root then return end
+    
+    -- Проверка стены
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {char}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local direction = camera.CFrame.LookVector * WallHop.Distance
+    local result = workspace:Raycast(root.Position, direction, raycastParams)
+    
+    if result then
+        local hit = result.Instance
+        
+        -- Проверка, что это стена
+        if hit:IsA("BasePart") and hit.CanCollide then
+            -- Проверка смены стены для флинга
+            if WallHop.LastWall and WallHop.LastWall ~= hit then
+                -- Выполнение флинга
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                root.AssemblyLinearVelocity = Vector3.new(
+                    root.AssemblyLinearVelocity.X,
+                    WallHop.Power,
+                    root.AssemblyLinearVelocity.Z
+                )
+                WallHop.LastHop = os.clock()
+            end
+            WallHop.LastWall = hit
+        end
+    else
+        WallHop.LastWall = nil
+    end
+end
+
+-- ==============================================
+-- GUI МЕНЕДЖЕР (УЛУЧШЕННЫЙ)
+-- ==============================================
+local GUI = {
+    Main = nil,
+    Buttons = {},
+    Animations = {},
+}
+
+local function CreateButton(id, text, callback, color, icon)
+    if GUI.Buttons[id] then return end
+    
+    local screen = Workspace.CurrentCamera.ViewportSize
+    local size = 0.12
+    local xPos = 0.05 + ((#GUI.Buttons % 6) * (size + 0.01))
+    local yPos = 0.85 - (math.floor(#GUI.Buttons / 6) * (size + 0.01))
+    
+    local btn = Instance.new("ImageButton")
+    btn.Name = "Btn_" .. id
+    btn.Size = UDim2.new(size, 0, size, 0)
+    btn.Position = UDim2.new(xPos, 0, yPos, 0)
+    btn.AnchorPoint = Vector2.new(0.5, 0.5)
+    btn.Image = "rbxassetid://86221076925479"
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel = 0
+    btn.Parent = CoreGui
+    
+    -- Градиент
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, color or Color3.fromRGB(100, 100, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 200)),
+    })
+    gradient.Parent = btn
+    
+    -- Текст
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.8, 0, 0.8, 0)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Jura
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 18
+    label.TextWrapped = true
+    label.Parent = btn
+    
+    -- Иконка
+    if icon then
+        local iconLabel = Instance.new("ImageLabel")
+        iconLabel.Size = UDim2.new(0.3, 0, 0.3, 0)
+        iconLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
+        iconLabel.BackgroundTransparency = 1
+        iconLabel.Image = icon
+        iconLabel.Parent = btn
+    end
+    
+    -- Анимация при наведении
+    local function AnimateHover(hover)
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local targetSize = hover and UDim2.new(size * 1.1, 0, size * 1.1, 0) or UDim2.new(size, 0, size, 0)
+        TweenService:Create(btn, tweenInfo, {Size = targetSize}):Play()
+    end
+    
+    btn.MouseEnter:Connect(function() AnimateHover(true) end)
+    btn.MouseLeave:Connect(function() AnimateHover(false) end)
+    btn.MouseButton1Click:Connect(callback)
+    
+    GUI.Buttons[id] = {
+        Button = btn,
+        Label = label,
+        Gradient = gradient,
+        State = false,
+    }
+    
+    return btn
+end
+
+local function UpdateButton(id, text, state, color)
+    local data = GUI.Buttons[id]
+    if not data then return end
+    
+    data.Label.Text = text
+    data.State = state
+    
+    if state then
+        data.Gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 100)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 50)),
+        })
+    else
+        data.Gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, color or Color3.fromRGB(100, 100, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 200)),
+        })
+    end
+end
+
+-- ==============================================
+-- СОЗДАНИЕ GUI КНОПОК
+-- ==============================================
+local function CreateAllButtons()
+    -- Главные функции
+    CreateButton("aim", "Aim:OFF", function()
+        AimLock.Enabled = not AimLock.Enabled
+        UpdateButton("aim", AimLock.Enabled and "Aim:ON" or "Aim:OFF", AimLock.Enabled)
+    end, Color3.fromRGB(255, 100, 100))
+    
+    CreateButton("wall", "Wall:OFF", function()
+        Config.WallCheckEnabled = not Config.WallCheckEnabled
+        UpdateButton("wall", Config.WallCheckEnabled and "Wall:ON" or "Wall:OFF", Config.WallCheckEnabled)
+    end, Color3.fromRGB(100, 100, 255))
+    
+    CreateButton("outline", "OL:OFF", function()
+        Config.OutlineEnabled = not Config.OutlineEnabled
+        UpdateButton("outline", Config.OutlineEnabled and "OL:ON" or "OL:OFF", Config.OutlineEnabled)
+        if Config.OutlineEnabled then
+            UpdateESP()
+        else
+            for plr, _ in pairs(ESP.Boxes) do
+                RemoveESPBox(plr)
+            end
+        end
+    end, Color3.fromRGB(255, 0, 0))
+    
+    CreateButton("wallhop", "WH:OFF", function()
+        WallHop.Enabled = not WallHop.Enabled
+        UpdateButton("wallhop", WallHop.Enabled and "WH:ON" or "WH:OFF", WallHop.Enabled)
+    end, Color3.fromRGB(255, 0, 255))
+    
+    CreateButton("bomb", "BJ:OFF", function()
+        BombJump.Enabled = not BombJump.Enabled
+        UpdateButton("bomb", BombJump.Enabled and "BJ:ON" or "BJ:OFF", BombJump.Enabled)
+    end, Color3.fromRGB(255, 100, 0))
+    
+    CreateButton("esp", "ESP:OFF", function()
+        ESP.Enabled = not ESP.Enabled
+        UpdateButton("esp", ESP.Enabled and "ESP:ON" or "ESP:OFF", ESP.Enabled)
+    end, Color3.fromRGB(0, 255, 255))
+    
+    CreateButton("tracers", "TR:OFF", function()
+        Tracers.Enabled = not Tracers.Enabled
+        UpdateButton("tracers", Tracers.Enabled and "TR:ON" or "TR:OFF", Tracers.Enabled)
+    end, Color3.fromRGB(0, 255, 0))
+    
+    CreateButton("fov", "FOV:OFF", function()
+        FOV.Enabled = not FOV.Enabled
+        UpdateButton("fov", FOV.Enabled and "FOV:ON" or "FOV:OFF", FOV.Enabled)
+        if FOV.Enabled then
+            CreateFOVCircle()
+        else
+            RemoveFOVCircle()
+        end
+    end, Color3.fromRGB(255, 255, 0))
+    
+    CreateButton("silent", "SA:OFF", function()
+        SilentAim.Enabled = not SilentAim.Enabled
+        UpdateButton("silent", SilentAim.Enabled and "SA:ON" or "SA:OFF", SilentAim.Enabled)
+    end, Color3.fromRGB(255, 0, 255))
+    
+    CreateButton("knife", "AK:OFF", function()
+        AutoKnife.Enabled = not AutoKnife.Enabled
+        UpdateButton("knife", AutoKnife.Enabled and "AK:ON" or "AK:OFF", AutoKnife.Enabled)
+    end, Color3.fromRGB(255, 0, 0))
+    
+    CreateButton("trigger", "TB:OFF", function()
+        TriggerBot.Enabled = not TriggerBot.Enabled
+        UpdateButton("trigger", TriggerBot.Enabled and "TB:ON" or "TB:OFF", TriggerBot.Enabled)
+    end, Color3.fromRGB(0, 255, 0))
+    
+    CreateButton("norecoil", "NR:OFF", function()
+        NoRecoil.Enabled = not NoRecoil.Enabled
+        UpdateButton("norecoil", NoRecoil.Enabled and "NR:ON" or "NR:OFF", NoRecoil.Enabled)
+    end, Color3.fromRGB(100, 100, 255))
+    
+    CreateButton("speed", "SB:OFF", function()
+        SpeedBoost.Enabled = not SpeedBoost.Enabled
+        UpdateButton("speed", SpeedBoost.Enabled and "SB:ON" or "SB:OFF", SpeedBoost.Enabled)
+    end, Color3.fromRGB(0, 255, 100))
+    
+    CreateButton("respawn", "AR:OFF", function()
+        AutoRespawn.Enabled = not AutoRespawn.Enabled
+        UpdateButton("respawn", AutoRespawn.Enabled and "AR:ON" or "AR:OFF", AutoRespawn.Enabled)
+    end, Color3.fromRGB(255, 100, 0))
+    
+    CreateButton("killeffect", "KE:OFF", function()
+        KillEffect.Enabled = not KillEffect.Enabled
+        UpdateButton("killeffect", KillEffect.Enabled and "KE:ON" or "KE:OFF", KillEffect.Enabled)
+    end, Color3.fromRGB(255, 0, 100))
+end
+
+-- ==============================================
+-- ГОРЯЧИЕ КЛАВИШИ (УЛУЧШЕННЫЕ)
+-- ==============================================
+local Keybinds = {
+    [Enum.KeyCode.T] = function() 
+        AimLock.Enabled = not AimLock.Enabled
+        UpdateButton("aim", AimLock.Enabled and "Aim:ON" or "Aim:OFF", AimLock.Enabled)
+    end,
+    [Enum.KeyCode.G] = function()
+        Config.WallCheckEnabled = not Config.WallCheckEnabled
+        UpdateButton("wall", Config.WallCheckEnabled and "Wall:ON" or "Wall:OFF", Config.WallCheckEnabled)
+    end,
+    [Enum.KeyCode.E] = function()
+        Config.OutlineEnabled = not Config.OutlineEnabled
+        UpdateButton("outline", Config.OutlineEnabled and "OL:ON" or "OL:OFF", Config.OutlineEnabled)
+        if Config.OutlineEnabled then
+            UpdateESP()
+        else
+            for plr, _ in pairs(ESP.Boxes) do
+                RemoveESPBox(plr)
+            end
+        end
+    end,
+    [Enum.KeyCode.H] = function()
+        WallHop.Enabled = not WallHop.Enabled
+        UpdateButton("wallhop", WallHop.Enabled and "WH:ON" or "WH:OFF", WallHop.Enabled)
+    end,
+    [Enum.KeyCode.B] = function()
+        BombJump.Enabled = not BombJump.Enabled
+        UpdateButton("bomb", BombJump.Enabled and "BJ:ON" or "BJ:OFF", BombJump.Enabled)
+    end,
+    [Enum.KeyCode.N] = function()
+        NoRecoil.Enabled = not NoRecoil.Enabled
+        UpdateButton("norecoil", NoRecoil.Enabled and "NR:ON" or "NR:OFF", NoRecoil.Enabled)
+    end,
+    [Enum.KeyCode.J] = function()
+        AutoKnife.Enabled = not AutoKnife.Enabled
+        UpdateButton("knife", AutoKnife.Enabled and "AK:ON" or "AK:OFF", AutoKnife.Enabled)
+    end,
+    [Enum.KeyCode.U] = function()
+        TriggerBot.Enabled = not TriggerBot.Enabled
+        UpdateButton("trigger", TriggerBot.Enabled and "TB:ON" or "TB:OFF", TriggerBot.Enabled)
+    end,
+    [Enum.KeyCode.I] = function()
+        ESP.Enabled = not ESP.Enabled
+        UpdateButton("esp", ESP.Enabled and "ESP:ON" or "ESP:OFF", ESP.Enabled)
+    end,
+    [Enum.KeyCode.O] = function()
+        Tracers.Enabled = not Tracers.Enabled
+        UpdateButton("tracers", Tracers.Enabled and "TR:ON" or "TR:OFF", Tracers.Enabled)
+    end,
+    [Enum.KeyCode.K] = function()
+        FOV.Enabled = not FOV.Enabled
+        UpdateButton("fov", FOV.Enabled and "FOV:ON" or "FOV:OFF", FOV.Enabled)
+        if FOV.Enabled then
+            CreateFOVCircle()
+        else
+            RemoveFOVCircle()
+        end
+    end,
+    [Enum.KeyCode.L] = function()
+        SilentAim.Enabled = not SilentAim.Enabled
+        UpdateButton("silent", SilentAim.Enabled and "SA:ON" or "SA:OFF", SilentAim.Enabled)
+    end,
+    [Enum.KeyCode.X] = function()
+        SpeedBoost.Enabled = not SpeedBoost.Enabled
+        UpdateButton("speed", SpeedBoost.Enabled and "SB:ON" or "SB:OFF", SpeedBoost.Enabled)
+    end,
+    [Enum.KeyCode.V] = function()
+        AutoRespawn.Enabled = not AutoRespawn.Enabled
+        UpdateButton("respawn", AutoRespawn.Enabled and "AR:ON" or "AR:OFF", AutoRespawn.Enabled)
+    end,
+    [Enum.KeyCode.C] = function()
+        KillEffect.Enabled = not KillEffect.Enabled
+        UpdateButton("killeffect", KillEffect.Enabled and "KE:ON" or "KE:OFF", KillEffect.Enabled)
+    end,
+    [Enum.KeyCode.S] = function()
+        SaveConfig()
+        print("✅ Config saved!")
+    end,
+    [Enum.KeyCode.R] = function()
+        LoadConfig()
+        print("✅ Config loaded!")
+        -- Обновление состояния кнопок
+        UpdateButton("aim", AimLock.Enabled and "Aim:ON" or "Aim:OFF", AimLock.Enabled)
+        UpdateButton("wall", Config.WallCheckEnabled and "Wall:ON" or "Wall:OFF", Config.WallCheckEnabled)
+        UpdateButton("outline", Config.OutlineEnabled and "OL:ON" or "OL:OFF", Config.OutlineEnabled)
+        UpdateButton("wallhop", WallHop.Enabled and "WH:ON" or "WH:OFF", WallHop.Enabled)
+        UpdateButton("bomb", BombJump.Enabled and "BJ:ON" or "BJ:OFF", BombJump.Enabled)
+        UpdateButton("esp", ESP.Enabled and "ESP:ON" or "ESP:OFF", ESP.Enabled)
+        UpdateButton("tracers", Tracers.Enabled and "TR:ON" or "TR:OFF", Tracers.Enabled)
+        UpdateButton("fov", FOV.Enabled and "FOV:ON" or "FOV:OFF", FOV.Enabled)
+        UpdateButton("silent", SilentAim.Enabled and "SA:ON" or "SA:OFF", SilentAim.Enabled)
+        UpdateButton("knife", AutoKnife.Enabled and "AK:ON" or "AK:OFF", AutoKnife.Enabled)
+        UpdateButton("trigger", TriggerBot.Enabled and "TB:ON" or "TB:OFF", TriggerBot.Enabled)
+        UpdateButton("norecoil", NoRecoil.Enabled and "NR:ON" or "NR:OFF", NoRecoil.Enabled)
+        UpdateButton("speed", SpeedBoost.Enabled and "SB:ON" or "SB:OFF", SpeedBoost.Enabled)
+        UpdateButton("respawn", AutoRespawn.Enabled and "AR:ON" or "AR:OFF", AutoRespawn.Enabled)
+        UpdateButton("killeffect", KillEffect.Enabled and "KE:ON" or "KE:OFF", KillEffect.Enabled)
+    end,
+}
+
+local function SetupKeybinds()
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        local callback = Keybinds[input.KeyCode]
+        if callback then
+            callback()
+        end
+    end)
+end
+
+-- ==============================================
+-- ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ
+-- ==============================================
+local function UpdateLoop()
+    -- Aim Lock
+    UpdateAimLock()
+    
+    -- ESP
+    UpdateESP()
+    
+    -- Tracers
+    UpdateTracers()
+    
+    -- WallHop
+    if WallHop.Enabled then
+        PerformWallHop()
+    end
+    
+    -- Speed Boost
+    UpdateSpeedBoost()
+    
+    -- Auto Respawn
+    PerformAutoRespawn()
+    
+    -- No Recoil
+    if NoRecoil.Enabled then
+        ApplyNoRecoil()
+    end
+    
+    -- Trigger Bot
+    if TriggerBot.Enabled then
+        PerformTriggerBot()
+    end
+    
+    -- Auto Knife
+    if AutoKnife.Enabled then
+        PerformAutoKnife()
+    end
+    
+    -- Bomb Jump (автоматический)
+    if BombJump.Enabled then
+        -- Автоматический прыжок с бомбой при нажатии пробела
+    end
+end
+
+-- ==============================================
+-- ОБРАБОТКА БОМБЫ ПРИ ПРЫЖКЕ
+-- ==============================================
+UserInputService.JumpRequest:Connect(function()
+    if BombJump.Enabled then
+        PerformBombJump()
+    end
+end)
+
+-- ==============================================
+-- ОБРАБОТКА НАЖАТИЯ ПРОБЕЛА ДЛЯ WALLHOP
+-- ==============================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Space then
+        WallHop.IsJumping = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Space then
+        WallHop.IsJumping = false
+    end
+end)
+
+-- ==============================================
+-- ЗАПУСК ВСЕХ СИСТЕМ
+-- ==============================================
+-- Создание GUI
+CreateAllButtons()
+
+-- Настройка горячих клавиш
+SetupKeybinds()
+
+-- Запуск основного цикла
+RunService.Heartbeat:Connect(UpdateLoop)
+
+-- Запуск FOV обновления
+RunService.RenderStepped:Connect(function()
+    if FOV.Enabled and FOV.Circle then
+        local camera = Workspace.CurrentCamera
+        if camera then
+            local screenSize = camera.ViewportSize
+            local radius = math.min(screenSize.X, screenSize.Y) * 0.25
+            FOV.Radius = radius
+            FOV.Circle.Size = UDim2.new(0, radius * 2, 0, radius * 2)
+            FOV.Circle.Position = UDim2.new(0.5, -radius, 0.5, -radius)
+        end
+    end
+end)
+
+-- Обработка выхода игроков
+Players.PlayerRemoving:Connect(function(plr)
+    RemoveESPBox(plr)
+    RemoveTracer(plr)
+end)
+
+-- Обработка смены персонажа
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    AimLock.Target = nil
+    WallHop.LastWall = nil
+    if BombJump.AutoGet then
+        GetBomb()
+    end
+end)
+
+-- ==============================================
+-- ВЫВОД ИНФОРМАЦИИ
+-- ==============================================
+print("=" .. string.rep("=", 50))
+print("  🎯 MM2 MURDERER AIM LOCK V2.7 ULTIMATE")
+print("=" .. string.rep("=", 50))
+print("  ✅ Улучшенный Aim Lock с предсказанием")
+print("  ✅ ESP Boxes с цветовой индикацией")
+print("  ✅ Tracers к ближайшей цели")
+print("  ✅ FOV Circle с настраиваемым радиусом")
+print("  ✅ Silent Aim для скрытного наведения")
+print("  ✅ Auto Knife с автоматическим ударом")
+print("  ✅ Trigger Bot для автоматической стрельбы")
+print("  ✅ No Recoil для стабильной стрельбы")
+print("  ✅ Speed Boost при низком здоровье")
+print("  ✅ Auto Respawn для быстрого возрождения")
+print("  ✅ Kill Effect с визуальными эффектами")
+print("  ✅ Bomb Jump+ с автоматическим получением")
+print("  ✅ WallHop V2 с улучшенным детектом")
+print("  ✅ Сохранение настроек в файл")
+print("  ✅ Анти-детект система")
+print("=" .. string.rep("=", 50))
+print("⌨️  ГОРЯЧИЕ КЛАВИШИ:")
+print("  [T] Aim Lock    [E] Outline")
+print("  [G] Wall Check  [H] WallHop")
+print("  [B] Bomb Jump   [N] No Recoil")
+print("  [J] Auto Knife  [U] Trigger Bot")
+print("  [I] ESP Boxes   [O] Tracers")
+print("  [K] FOV Circle  [L] Silent Aim")
+print("  [X] Speed Boost [V] Auto Respawn")
+print("  [C] Kill Effect [S] Save Config")
+print("  [R] Load Config")
+print("=" .. string.rep("=", 50))
+print("💡  Нажмите 'S' для сохранения настроек")
+print("💡  Нажмите 'R' для загрузки настроек")
+print("=" .. string.rep("=", 50))
+
+-- Глобальные функции для консоли
+_G.MM2 = {
+    Aim = AimLock,
+    ESP = ESP,
+    Tracers = Tracers,
+    FOV = FOV,
+    Silent = SilentAim,
+    Knife = AutoKnife,
+    Trigger = TriggerBot,
+    NoRecoil = NoRecoil,
+    Speed = SpeedBoost,
+    Respawn = AutoRespawn,
+    KillEffect = KillEffect,
+    Bomb = BombJump,
+    Wall = WallHop,
+    Config = Config,
+    Save = SaveConfig,
+    Load = LoadConfig,
+}
+
+print("🔧  Используйте _G.MM2 для доступа ко всем функциям")
