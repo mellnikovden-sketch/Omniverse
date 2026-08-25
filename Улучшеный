@@ -1,6 +1,5 @@
--- MM2 ULTIMATE PACKAGE v2.7
--- Aim Lock + Outline + Wallhop + RT SYSTEM
--- REMOVED: Bomb Jump
+-- MM2 ULTIMATE PACKAGE v2.8
+-- Aim Lock + Outline + Wallhop + RT SYSTEM + Bomb Jump+
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -123,6 +122,18 @@ local __RT_COLOR = ColorSequence.new({
     ColorSequenceKeypoint.new(1,   __RGB(255, 255, 255))
 })
 
+local __BOMB_COLOR = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   __RGB(255, 215, 0)),
+    ColorSequenceKeypoint.new(0.6, __RGB(255, 140, 0)),
+    ColorSequenceKeypoint.new(1,   __RGB(184, 134, 11))
+})
+
+local __GOLD_BOMB_COLOR = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   __RGB(255, 215, 0)),
+    ColorSequenceKeypoint.new(0.6, __RGB(255, 140, 0)),
+    ColorSequenceKeypoint.new(1,   __RGB(184, 134, 11))
+})
+
 local muteButtonSounds = false
 
 local function bind_safecallback(callback)
@@ -204,6 +215,10 @@ function BindableButtons.AddBButton(id, text, clickFunc, colorType, customSize)
         Stroke.Color = __WALLHOP_COLOR
     elseif colorType == "rt" then
         Stroke.Color = __RT_COLOR
+    elseif colorType == "bomb" then
+        Stroke.Color = __BOMB_COLOR
+    elseif colorType == "goldbomb" then
+        Stroke.Color = __GOLD_BOMB_COLOR
     else
         Stroke.Color = __NORMAL_COLOR
     end
@@ -299,6 +314,10 @@ function BindableButtons.UpdateBButtonColor(id, isActive, colorType)
                 stroke.Color = __WALLHOP_COLOR
             elseif colorType == "rt" then
                 stroke.Color = __RT_COLOR
+            elseif colorType == "bomb" then
+                stroke.Color = __BOMB_COLOR
+            elseif colorType == "goldbomb" then
+                stroke.Color = __GOLD_BOMB_COLOR
             else
                 stroke.Color = __NORMAL_COLOR
             end
@@ -481,7 +500,7 @@ function FindMurderer(preferTarget)
                 local hum = pl.Character:FindFirstChild("Humanoid")
                 if hum and hum.Health > 0 then
                     if WallCheckEnabled and not IsPlayerVisible(pl) then
-                        continue
+                        goto continue
                     end
                     
                     local root = pl.Character:FindFirstChild("HumanoidRootPart")
@@ -498,6 +517,7 @@ function FindMurderer(preferTarget)
                 end
             end
         end
+        ::continue::
     end
     
     return bestTarget
@@ -1861,6 +1881,322 @@ end
 CreateResetGUIElements()
 
 -- ==============================================
+-- BOMB JUMP+ СИСТЕМА
+-- ==============================================
+
+-- Расширенный список имен бомб для MM2
+local BOMB_NAMES = {
+    "FakeBomb", 
+    "Bomb", 
+    "GiftBomb", 
+    "PresentBomb",
+    "Snowball",
+    "CandyBomb"
+}
+
+-- Конфигурация для разных типов бомб
+local BOMB_CONFIGS = {
+    FakeBomb = {
+        Cooldown = 22,
+        Power = 58,
+        IsGold = false,
+        RemotePath = "Remote",
+        DisplayName = "Bomb Jump"
+    },
+    GoldBomb = {
+        Cooldown = 4,
+        Power = 65,
+        IsGold = true,
+        RemotePath = "Remote",
+        DisplayName = "Gold Bomb Jump"
+    }
+}
+
+local BombState = {
+    enabled = false,
+    onCooldown = false,
+    debounce = false,
+    autoGetBomb = false,
+    justRespawned = false,
+    activeTouches = {}
+}
+
+local BombSounds = {
+    Click = Instance.new("Sound"),
+    Cooldown = Instance.new("Sound")
+}
+BombSounds.Click.SoundId = "rbxassetid://6895079853"
+BombSounds.Click.Volume = 1.0
+BombSounds.Cooldown.SoundId = "rbxassetid://138090596"
+BombSounds.Cooldown.Volume = 1.0
+
+local function PlaySound(snd)
+    pcall(function()
+        if snd then
+            SoundService:PlayLocalSound(snd)
+        end
+    end)
+end
+
+local function IsPlayerInAir()
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return false end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    local state = humanoid:GetState()
+    if state == Enum.HumanoidStateType.Jumping or 
+       state == Enum.HumanoidStateType.FallingDown or
+       state == Enum.HumanoidStateType.Freefall then
+        return true
+    end
+    
+    local velocityY = rootPart.Velocity.Y
+    return math.abs(velocityY) > 0.5
+end
+
+local function ResetCooldown()
+    BombState.onCooldown = false
+    local btn = BindableButtons.Buttons["bombjump_toggle"]
+    if btn then
+        BindableButtons.UpdateBButtonText("bombjump_toggle", BombState.onCooldown and "BJ:W" or "BJ")
+        BindableButtons.UpdateBButtonColor("bombjump_toggle", BombState.enabled, "bomb")
+    end
+end
+
+local function StartCooldown()
+    BombState.onCooldown = true
+    BombState.debounce = false
+    
+    task.spawn(function()
+        local cooldownTime = 22
+        for i = cooldownTime, 1, -1 do
+            if not BombState.onCooldown then break end
+            local btn = BindableButtons.Buttons["bombjump_toggle"]
+            if btn then
+                BindableButtons.UpdateBButtonText("bombjump_toggle", tostring(i))
+            end
+            task.wait(1)
+        end
+        if BombState.onCooldown then ResetCooldown() end
+    end)
+end
+
+local function GetCenterPosition()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local root = character.HumanoidRootPart
+        local lookDir = Workspace.CurrentCamera.CFrame.LookVector
+        return root.Position + (lookDir * 3) + Vector3.new(0, -2, 0)
+    end
+    return nil
+end
+
+local function MakeCharacterJump()
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end
+
+local function UnequipBomb(bombName)
+    task.spawn(function()
+        task.wait(0.5)
+        local character = LocalPlayer.Character
+        if character then
+            local bomb = character:FindFirstChild(bombName)
+            if bomb then
+                bomb.Parent = LocalPlayer.Backpack or character
+            end
+        end
+    end)
+end
+
+local function GetAnyBomb(bombName)
+    local character = LocalPlayer.Character
+    if not character then return false, nil end
+    
+    local bombNamesToCheck = {bombName}
+    if bombName == "FakeBomb" then
+        bombNamesToCheck = BOMB_NAMES
+    end
+    
+    for _, name in ipairs(bombNamesToCheck) do
+        local bomb = character:FindFirstChild(name)
+        if bomb then return true, bomb end
+    end
+    
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        for _, name in ipairs(bombNamesToCheck) do
+            local bomb = backpack:FindFirstChild(name)
+            if bomb then
+                bomb.Parent = character
+                return true, bomb
+            end
+        end
+    end
+    
+    local success = false
+    local attempts = 0
+    while not success and attempts < 3 do
+        attempts = attempts + 1
+        local ok = pcall(function()
+            ReplicatedStorage.Remotes.Extras.ReplicateToy:InvokeServer(bombName)
+        end)
+        if ok then 
+            success = true
+            break
+        end
+        task.wait(0.1)
+    end
+    
+    if success then
+        for _ = 1, 5 do
+            for _, name in ipairs(bombNamesToCheck) do
+                local bomb = character:FindFirstChild(name)
+                if bomb then return true, bomb end
+                if backpack then
+                    bomb = backpack:FindFirstChild(name)
+                    if bomb then
+                        bomb.Parent = character
+                        return true, bomb
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+    end
+    
+    return false, nil
+end
+
+local function IsHoldingBomb(bombName)
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local bombNamesToCheck = {bombName}
+    if bombName == "FakeBomb" then
+        bombNamesToCheck = BOMB_NAMES
+    end
+    
+    for _, name in ipairs(bombNamesToCheck) do
+        if character:FindFirstChild(name) then
+            return true
+        end
+    end
+    return false
+end
+
+local function FastBombJump()
+    if not IsPlayerInAir() then return end
+    if BombState.onCooldown or BombState.debounce or BombState.justRespawned then return end
+    BombState.debounce = true
+    
+    local success, bomb = GetAnyBomb("FakeBomb")
+    
+    if success and bomb then
+        local position = GetCenterPosition()
+        if position then
+            local remote = bomb:FindFirstChild("Remote")
+            if remote then
+                PlaySound(BombSounds.Click)
+                pcall(function()
+                    remote:FireServer(CFrame.new(position), 50)
+                end)
+            end
+            
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local currentVelocity = root.AssemblyLinearVelocity
+                root.AssemblyLinearVelocity = Vector3.new(
+                    currentVelocity.X, 
+                    currentVelocity.Y + 58, 
+                    currentVelocity.Z
+                )
+            end
+            
+            MakeCharacterJump()
+            UnequipBomb(bomb.Name)
+            
+            task.spawn(function()
+                task.wait(0.1)
+                StartCooldown()
+            end)
+        end
+    end
+    
+    task.spawn(function()
+        task.wait(0.5)
+        BombState.debounce = false
+    end)
+end
+
+-- Обработка ввода для бомб
+local TAP_MOVEMENT_THRESHOLD = 10
+local TAP_TIME_THRESHOLD = 0.3
+
+local function SetupBombInput()
+    RootMaid:GiveTasks(
+        UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.UserInputType == Enum.UserInputType.Touch or 
+               input.UserInputType == Enum.UserInputType.MouseButton1 then
+                BombState.activeTouches[input] = {
+                    startPosition = input.Position, 
+                    startTime = tick(), 
+                    moved = false
+                }
+            end
+        end),
+        UserInputService.InputChanged:Connect(function(input)
+            local data = BombState.activeTouches[input]
+            if data and (input.Position - data.startPosition).Magnitude > TAP_MOVEMENT_THRESHOLD then
+                data.moved = true
+            end
+        end),
+        UserInputService.InputEnded:Connect(function(input, gp)
+            if gp then 
+                BombState.activeTouches[input] = nil 
+                return 
+            end
+            local data = BombState.activeTouches[input]
+            if data and not data.moved and tick() - data.startTime <= TAP_TIME_THRESHOLD then
+                if BombState.enabled and not BombState.onCooldown and not BombState.debounce then
+                    if IsHoldingBomb("FakeBomb") and IsPlayerInAir() then
+                        FastBombJump()
+                    end
+                end
+            end
+            BombState.activeTouches[input] = nil
+        end),
+        LocalPlayer.CharacterAdded:Connect(function()
+            ResetCooldown()
+            BombState.activeTouches = {}
+            BombState.justRespawned = true
+            task.wait(1)
+            BombState.justRespawned = false
+            if BombState.autoGetBomb then
+                task.wait(0.2)
+                pcall(function() 
+                    ReplicatedStorage.Remotes.Extras.ReplicateToy:InvokeServer("FakeBomb") 
+                end)
+            end
+        end)
+    )
+end
+
+SetupBombInput()
+
+-- ==============================================
 -- КНОПКИ НА ЭКРАНЕ
 -- ==============================================
 -- Aim Lock
@@ -1868,7 +2204,7 @@ BindableButtons.AddBButton("aim_toggle", "Aim:OFF", function()
     AimLockEnabled = not AimLockEnabled
     if AimLockEnabled then TargetPlayer = FindMurderer(nil) else TargetPlayer = nil end
     BindableButtons.UpdateBButtonText("aim_toggle", AimLockEnabled and "Aim:ON" or "Aim:OFF")
-    BindableButtons.UpdateBButtonColor("aim_toggle", AimLockEnabled, "aim")
+    BindableButtons.UpdateBButtonColor("aim_toggle", AimLockEnabled, "wall")
 end)
 
 -- Wall Check
@@ -1897,6 +2233,13 @@ BindableButtons.AddBButton("rt_toggle", "RT", function()
     ResetGUI.Enabled = ResetState.resetGuiOpen
 end, "rt")
 
+-- Bomb Jump
+BindableButtons.AddBButton("bombjump_toggle", "BJ", function()
+    if BombState.enabled then
+        FastBombJump()
+    end
+end, "bomb")
+
 -- ==============================================
 -- NO CLIP LOOP
 -- ==============================================
@@ -1919,11 +2262,53 @@ RunService:BindToRenderStep("MM2_AimLock", Enum.RenderPriority.Camera.Value + 1,
 RunService.Heartbeat:Connect(OutlineUpdateLoop)
 
 -- ==============================================
+-- ГОРЯЧИЕ КЛАВИШИ
+-- ==============================================
+RootMaid:GiveTask(UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    
+    if input.KeyCode == Enum.KeyCode.T then
+        local btn = BindableButtons.Buttons["aim_toggle"]
+        if btn then btn:GetPropertyChangedSignal("Text"):Wait() 
+            btn:GetPropertyChangedSignal("Text"):Disconnect() 
+        end
+        if btn then btn:GetPropertyChangedSignal("Text"):Disconnect() end
+        AimLockEnabled = not AimLockEnabled
+        if AimLockEnabled then TargetPlayer = FindMurderer(nil) else TargetPlayer = nil end
+        BindableButtons.UpdateBButtonText("aim_toggle", AimLockEnabled and "Aim:ON" or "Aim:OFF")
+        BindableButtons.UpdateBButtonColor("aim_toggle", AimLockEnabled, "wall")
+        
+    elseif input.KeyCode == Enum.KeyCode.G then
+        WallCheckEnabled = not WallCheckEnabled
+        BindableButtons.UpdateBButtonText("wall_toggle", WallCheckEnabled and "Wall:ON" or "Wall:OFF")
+        BindableButtons.UpdateBButtonColor("wall_toggle", WallCheckEnabled, "wall")
+        
+    elseif input.KeyCode == Enum.KeyCode.E then
+        OutlineEnabled = not OutlineEnabled
+        if OutlineEnabled then FullRefreshOutline() else for plr, _ in pairs(OutlinedPlayers) do RemoveOutline(plr) end end
+        BindableButtons.UpdateBButtonText("outline_toggle", OutlineEnabled and "OL:ON" or "OL:OFF")
+        BindableButtons.UpdateBButtonColor("outline_toggle", OutlineEnabled, "outline")
+        
+    elseif input.KeyCode == Enum.KeyCode.H then
+        ToggleWallHop()
+        
+    elseif input.KeyCode == Enum.KeyCode.R then
+        ResetState.resetGuiOpen = not ResetState.resetGuiOpen
+        ResetGUI.Enabled = ResetState.resetGuiOpen
+        
+    elseif input.KeyCode == Enum.KeyCode.B then
+        if BombState.enabled then
+            FastBombJump()
+        end
+    end
+end))
+
+-- ==============================================
 -- ОЧИСТКА
 -- ==============================================
 RootMaid:GiveTask(function()
     RunService:UnbindFromRenderStep("MM2_AimLock")
-    for _, id in ipairs({"aim_toggle", "wall_toggle", "outline_toggle", "wallhop_toggle", "rt_toggle"}) do
+    for _, id in ipairs({"aim_toggle", "wall_toggle", "outline_toggle", "wallhop_toggle", "rt_toggle", "bombjump_toggle"}) do
         BindableButtons.DeleteBButton(id)
     end
     if ResetGUI then ResetGUI:Destroy() end
@@ -1933,7 +2318,7 @@ end)
 -- ВЫВОД МЕНЮ
 -- ==============================================
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("⚡ MM2 ULTIMATE PACKAGE v2.7")
+print("⚡ MM2 ULTIMATE PACKAGE v2.8")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("🎯 ФУНКЦИИ:")
 print("  🎯 Aim Lock    - Автонаведение на убийцу")
@@ -1941,9 +2326,10 @@ print("  🧱 Wall Check  - Проверка видимости")
 print("  👁️ Outline     - Подсветка игроков по ролям")
 print("  🧱 Wallhop     - Флинг у стыка стен (H)")
 print("  🔄 RT System   - Сброс игроков (R)")
+print("  💣 Bomb Jump   - Прыжок с бомбой (B)")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("⌨️ ГОРЯЧИЕ КЛАВИШИ:")
 print("  [T] - Aim Lock    [G] - Wall Check")
 print("  [E] - Outline     [H] - Wallhop")
-print("  [R] - RT GUI")
+print("  [R] - RT GUI      [B] - Bomb Jump")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
