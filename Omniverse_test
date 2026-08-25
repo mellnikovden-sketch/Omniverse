@@ -1,10 +1,10 @@
--- Silent Aim для MM2 (исправленный)
--- Работает через перехват выстрела
+-- Silent Aim для MM2 (ТЕЛЕФОН)
+-- Работает через нажатие на экран
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ==============================================
@@ -80,7 +80,42 @@ local function GetTargetPosition(murderer)
 end
 
 -- ==============================================
--- СОЗДАНИЕ GUI
+-- ПОИСК REMOTE ДЛЯ ВЫСТРЕЛА
+-- ==============================================
+
+local function FindShootRemote()
+    -- Ищем в ReplicatedStorage
+    local weaponEvents = ReplicatedStorage:FindFirstChild("WeaponEvents")
+    if weaponEvents then
+        for _, child in ipairs(weaponEvents:GetChildren()) do
+            if child:IsA("RemoteEvent") then
+                return child
+            end
+        end
+    end
+    
+    -- Ищем другие Remote
+    for _, child in ipairs(ReplicatedStorage:GetChildren()) do
+        if child:IsA("RemoteEvent") then
+            local name = child.Name:lower()
+            if name:find("shoot") or name:find("gun") or name:find("beam") or name:find("fire") then
+                return child
+            end
+        end
+    end
+    
+    return nil
+end
+
+local shootRemote = FindShootRemote()
+if shootRemote then
+    print("✅ Найден Remote: " .. shootRemote.Name)
+else
+    print("⚠️ Remote не найден")
+end
+
+-- ==============================================
+-- СОЗДАНИЕ GUI (ДЛЯ ТЕЛЕФОНА)
 -- ==============================================
 
 local screenGui = Instance.new("ScreenGui")
@@ -91,10 +126,10 @@ screenGui.IgnoreGuiInset = true
 local parent = gethui and gethui() or game:GetService("CoreGui")
 screenGui.Parent = parent
 
--- Кнопка
+-- Кнопка (увеличил для телефона)
 local button = Instance.new("ImageButton")
 button.Name = "ToggleButton"
-button.Size = UDim2.new(0, 60, 0, 60)
+button.Size = UDim2.new(0, 80, 0, 80)
 button.Position = UDim2.new(0.85, 0, 0.85, 0)
 button.AnchorPoint = Vector2.new(0.5, 0.5)
 button.BackgroundTransparency = 1
@@ -107,7 +142,7 @@ text.Size = UDim2.new(1, 0, 1, 0)
 text.BackgroundTransparency = 1
 text.Text = "SA:OFF"
 text.TextColor3 = Color3.fromRGB(255, 255, 255)
-text.TextSize = 14
+text.TextSize = 16
 text.Font = Enum.Font.Jura
 text.Parent = button
 
@@ -141,11 +176,11 @@ end
 local function ToggleSilentAim()
     Config.Enabled = not Config.Enabled
     UpdateButton()
-    print("🎯 Silent Aim: " .. (Config.Enabled and "ENABLED" or "DISABLED"))
+    print("🎯 Silent Aim: " .. (Config.Enabled and "ВКЛЮЧЕН" or "ВЫКЛЮЧЕН"))
     if Config.Enabled then
         local murderer = FindMurderer()
         if murderer then
-            print("🔪 Убийца найден: " .. murderer.Name)
+            print("🔪 Убийца: " .. murderer.Name)
         else
             print("❌ Убийца не найден")
         end
@@ -153,12 +188,13 @@ local function ToggleSilentAim()
 end
 
 -- ==============================================
--- ПОДКЛЮЧЕНИЕ КНОПКИ
+-- ПОДКЛЮЧЕНИЕ КНОПКИ (ДЛЯ ТЕЛЕФОНА)
 -- ==============================================
 
 button.MouseButton1Click:Connect(ToggleSilentAim)
 button.TouchTap:Connect(ToggleSilentAim)
 
+-- Клавиша S (для клавиатуры если есть)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.S then
@@ -167,122 +203,107 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==============================================
--- ОСНОВНАЯ ЛОГИКА SILENT AIM (ИСПРАВЛЕННАЯ)
+-- ОСНОВНАЯ ЛОГИКА SILENT AIM (ДЛЯ ТЕЛЕФОНА)
 -- ==============================================
 
--- Находим Remote GunBeam
-local gunBeamRemote = ReplicatedStorage:FindFirstChild("WeaponEvents")
-if gunBeamRemote then
-    gunBeamRemote = gunBeamRemote:FindFirstChild("GunBeam")
-end
-
-print(gunBeamRemote and "✅ Найден Remote: GunBeam" or "❌ GunBeam не найден")
-
--- Сохраняем оригинальные методы
-local originalFireServer = nil
-local originalInvokeServer = nil
-
--- Функция для обработки выстрела
-local function ProcessGunBeam(remote, ...)
-    if not Config.Enabled then
-        -- Если выключен, вызываем оригинал
-        if originalFireServer then
-            return originalFireServer(remote, ...)
-        end
-        return
-    end
+-- Функция выстрела в убийцу
+local function ShootMurderer()
+    if not Config.Enabled then return end
+    if not shootRemote then return end
     
     local murderer = FindMurderer()
-    if not murderer then
-        if originalFireServer then
-            return originalFireServer(remote, ...)
-        end
-        return
+    if not murderer then 
+        print("❌ Убийца не найден")
+        return 
     end
     
     local targetPos = GetTargetPosition(murderer)
-    if not targetPos then
-        if originalFireServer then
-            return originalFireServer(remote, ...)
-        end
-        return
+    if not targetPos then return end
+    
+    -- Пробуем разные варианты вызова
+    local success = false
+    
+    -- Вариант 1: просто позиция
+    success = pcall(function()
+        shootRemote:FireServer(targetPos)
+    end)
+    
+    if not success then
+        -- Вариант 2: с игроком
+        success = pcall(function()
+            shootRemote:FireServer(LocalPlayer, targetPos)
+        end)
     end
     
-    -- Получаем аргументы
-    local args = {...}
-    
-    -- Для GunBeam обычно передаются: (player, position, something)
-    -- Заменяем позицию на цель
-    for i, arg in ipairs(args) do
-        if typeof(arg) == "Vector3" then
-            args[i] = targetPos
-        elseif typeof(arg) == "CFrame" then
+    if not success then
+        -- Вариант 3: с CFrame
+        success = pcall(function()
             local camera = workspace.CurrentCamera
             if camera then
-                args[i] = CFrame.lookAt(camera.CFrame.Position, targetPos)
+                shootRemote:FireServer(CFrame.lookAt(camera.CFrame.Position, targetPos))
             end
-        elseif type(arg) == "table" then
-            if arg.Position then
-                arg.Position = targetPos
+        end)
+    end
+    
+    if not success then
+        -- Вариант 4: с именем
+        success = pcall(function()
+            shootRemote:FireServer(LocalPlayer.Name, targetPos)
+        end)
+    end
+    
+    if success then
+        print("🔫 Выстрел в убийцу!")
+    else
+        print("❌ Не удалось выстрелить")
+    end
+end
+
+-- ==============================================
+-- ПЕРЕХВАТ НАЖАТИЯ НА ЭКРАН (ДЛЯ ТЕЛЕФОНА)
+-- ==============================================
+
+-- Перехватываем касания экрана
+UserInputService.TouchEnabled = true
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- Если это касание экрана
+    if input.UserInputType == Enum.UserInputType.Touch then
+        -- Проверяем что это не нажатие на кнопку
+        local guiObject = game:GetService("GuiService"):GetGuiObjectsAtPosition(input.Position)
+        local isButton = false
+        for _, obj in ipairs(guiObject) do
+            if obj == button then
+                isButton = true
+                break
             end
         end
+        
+        if not isButton then
+            -- Это выстрел!
+            task.wait(0.05) -- небольшая задержка
+            ShootMurderer()
+        end
     end
-    
-    -- Вызываем оригинал с измененными аргументами
-    if originalFireServer then
-        return originalFireServer(remote, unpack(args))
-    end
-end
-
--- Перехватываем GunBeam
-if gunBeamRemote and gunBeamRemote:IsA("RemoteEvent") then
-    originalFireServer = gunBeamRemote.FireServer
-    gunBeamRemote.FireServer = function(self, ...)
-        return ProcessGunBeam(self, ...)
-    end
-    print("✅ GunBeam перехвачен")
-end
+end)
 
 -- ==============================================
--- АЛЬТЕРНАТИВНЫЙ МЕТОД ЧЕРЕЗ MOUSE
+-- АВТОМАТИЧЕСКИЙ ПОИСК УБИЙЦЫ
 -- ==============================================
 
-local function HookMouse()
-    local mouse = LocalPlayer:GetMouse()
-    if not mouse then return end
-    
-    local originalButton1Down = mouse.Button1Down
-    
-    mouse.Button1Down = function(...)
+-- Обновляем поиск убийцы каждые 2 секунды
+task.spawn(function()
+    while true do
+        task.wait(2)
         if Config.Enabled then
             local murderer = FindMurderer()
-            if murderer and gunBeamRemote then
-                local targetPos = GetTargetPosition(murderer)
-                if targetPos then
-                    pcall(function()
-                        -- Пробуем разные варианты аргументов
-                        gunBeamRemote:FireServer(targetPos)
-                        gunBeamRemote:FireServer(LocalPlayer, targetPos)
-                        gunBeamRemote:FireServer(LocalPlayer.Name, targetPos)
-                    end)
-                    return
-                end
+            if murderer then
+                print("🔪 Убийца: " .. murderer.Name)
             end
         end
-        if originalButton1Down then
-            return originalButton1Down(...)
-        end
     end
-end
-
--- Запускаем
-task.wait(0.5)
-HookMouse()
-
--- Перехват при появлении персонажа
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    HookMouse()
 end)
 
 -- ==============================================
@@ -290,18 +311,20 @@ end)
 -- ==============================================
 
 print("═══════════════════════════════════")
-print("  🔪 SILENT AIM для MM2 (ИСПРАВЛЕННЫЙ)")
+print("  📱 SILENT AIM для MM2 (ТЕЛЕФОН)")
 print("═══════════════════════════════════")
-print("  🎯 Перехвачен Remote: GunBeam")
-print("  🔫 Стреляйте куда угодно - пуля попадет в убийцу")
-print("  🖱️  Кнопка на экране - Вкл/Выкл")
-print("  ⌨️  Клавиша S - Вкл/Выкл")
+print("  🎯 Наводится на убийцу")
+print("  🔫 Нажмите на экран для выстрела")
+print("  🖱️  Кнопка внизу справа - Вкл/Выкл")
 print("═══════════════════════════════════")
-print("  🔧 Команды:")
-print("  • _G.ToggleSilentAim() - вкл/выкл")
+print("  📌 Как использовать:")
+print("  1. Нажмите кнопку SA:OFF")
+print("  2. Она станет зеленой - SA:ON")
+print("  3. Нажимайте на экран")
+print("  4. Пуля полетит в убийцу!")
 print("═══════════════════════════════════")
 
 _G.ToggleSilentAim = ToggleSilentAim
 _G.SilentAimConfig = Config
 
-print("✅ Скрипт загружен! Нажмите S или кнопку на экране")
+print("✅ Готово! Нажмите кнопку на экране")
