@@ -2,11 +2,9 @@
     ═══════════════════════════════════════════════════════════
     🔥 OMEGA ULTIMATE v5.3 - ТАБЛИЦА ЦВЕТОВ 🔥
     ═══════════════════════════════════════════════════════════
-    ОСОБЕННОСТИ:
-    • Кнопка открытия таблицы цветов в секции
-    • Таблица с прокруткой и индикатором выбранного цвета
-    • Индикатор только один (без багов)
-    • Открывается/закрывается по нажатию
+    • Полная замена dropdown на таблицу с прокруткой
+    • Индикатор выбранного цвета (только один)
+    • Открывается/закрывается по кнопке в секции
     ═══════════════════════════════════════════════════════════
 ]]
 
@@ -21,7 +19,7 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService") -- НОВОЕ
+local UserInputService = game:GetService("UserInputService") -- для закрытия по клику вне
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -907,7 +905,7 @@ local function CreatePremiumMonitor()
 end
 
 -- ═══════════════════════════════════════════════════════════
--- ФУНКЦИЯ СМЕНЫ ЦВЕТА
+-- ФУНКЦИЯ СМЕНЫ ЦВЕТА (ОСТАВЛЯЕМ БЕЗ ИЗМЕНЕНИЙ)
 -- ═══════════════════════════════════════════════════════════
 
 local function ChangeColor(colorName)
@@ -922,76 +920,85 @@ local function ChangeColor(colorName)
 end
 
 -- ═══════════════════════════════════════════════════════════
--- ⭐ НОВОЕ: ТАБЛИЦА ЦВЕТОВ С ПРОКРУТКОЙ
+-- ⭐ НОВОЕ: ТАБЛИЦА ЦВЕТОВ С ПРОКРУТКОЙ (ЗАМЕНЯЕТ DROPDOWN)
 -- ═══════════════════════════════════════════════════════════
 
-local ColorTableGui = nil  -- будет хранить ссылку на GUI таблицы
+local ColorTableGui = nil
 local ColorTableOpen = false
 
 local function CreateColorTable()
-    -- Если уже открыта, просто закрываем
+    -- Если уже открыта, закрываем
     if ColorTableGui then
         ColorTableGui:Destroy()
         ColorTableGui = nil
         ColorTableOpen = false
         return
     end
-    
+
+    ColorTableOpen = true
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ColorTable"
     screenGui.Parent = game.CoreGui
     screenGui.ResetOnSpawn = false
     screenGui.IgnoreGuiInset = true
     ColorTableGui = screenGui
-    ColorTableOpen = true
-    
-    -- Основной фрейм (темный, с прозрачностью)
+
+    -- Основной фрейм
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0.8, 0, 0.7, 0)
-    mainFrame.Position = UDim2.new(0.1, 0, 0.15, 0)
+    mainFrame.Size = UDim2.new(0.85, 0, 0.8, 0)
+    mainFrame.Position = UDim2.new(0.075, 0, 0.10, 0)
     mainFrame.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
     mainFrame.BackgroundTransparency = 0.05
     mainFrame.BorderSizePixel = 0
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = screenGui
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
-    
+
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(80, 60, 180)
     stroke.Thickness = 2
-    stroke.Transparency = 0.3
+    stroke.Transparency = 0.2
     stroke.Parent = mainFrame
-    
+
+    local strokeGradient = Instance.new("UIGradient")
+    local preset = COLOR_PRESETS[State.CurrentColor] or COLOR_PRESETS.OBSIDIAN
+    local gradSeq = {}
+    for _, point in ipairs(preset.gradient) do
+        table.insert(gradSeq, ColorSequenceKeypoint.new(point[1], point[2]))
+    end
+    strokeGradient.Color = ColorSequence.new(gradSeq)
+    strokeGradient.Parent = stroke
+
     -- Заголовок
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Size = UDim2.new(1, 0, 0, 45)
     title.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
     title.BackgroundTransparency = 0.2
-    title.Text = "🎨 Выбор цвета"
+    title.Text = "🎨 Выбор цвета GUI"
     title.TextColor3 = Color3.fromRGB(200, 190, 220)
     title.TextSize = 18
     title.Font = Enum.Font.Jura
     title.TextXAlignment = Enum.TextXAlignment.Center
     title.Parent = mainFrame
-    
+
     local titleCorner = Instance.new("UICorner")
     titleCorner.CornerRadius = UDim.new(0, 12)
     titleCorner.Parent = title
-    
+
     -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 35, 0, 35)
-    closeBtn.Position = UDim2.new(1, -42, 0, 3)
+    closeBtn.Position = UDim2.new(1, -42, 0, 5)
     closeBtn.BackgroundTransparency = 1
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(150, 140, 170)
     closeBtn.TextSize = 18
     closeBtn.Font = Enum.Font.Jura
     closeBtn.Parent = title
-    
+
     closeBtn.Activated:Connect(function()
         if ColorTableGui then
             ColorTableGui:Destroy()
@@ -999,71 +1006,69 @@ local function CreateColorTable()
             ColorTableOpen = false
         end
     end)
-    
-    -- Контейнер для списка цветов (с прокруткой)
+
+    -- Контейнер с прокруткой
     local container = Instance.new("ScrollingFrame")
-    container.Size = UDim2.new(1, -10, 1, -50)
-    container.Position = UDim2.new(0, 5, 0, 45)
+    container.Size = UDim2.new(1, -10, 1, -55)
+    container.Position = UDim2.new(0, 5, 0, 50)
     container.BackgroundTransparency = 1
     container.BorderSizePixel = 0
     container.CanvasSize = UDim2.new(0, 0, 0, 0)
     container.ScrollBarThickness = 4
     container.ScrollBarImageColor3 = Color3.fromRGB(80, 60, 180)
     container.Parent = mainFrame
-    
-    -- Создаем кнопки для каждого цвета
+
+    -- Создаём кнопки для каждого цвета
     local yPos = 0
-    local buttonHeight = 35
-    local spacing = 4
-    local currentSelected = State.CurrentColor
-    
+    local btnHeight = 38
+    local spacing = 5
+    local selectedKey = State.CurrentColor
+
     -- Сортируем ключи для порядка
     local sortedKeys = {}
     for key in pairs(COLOR_PRESETS) do
         table.insert(sortedKeys, key)
     end
     table.sort(sortedKeys)
-    
+
     for _, key in ipairs(sortedKeys) do
-        local preset = COLOR_PRESETS[key]
+        local presetColor = COLOR_PRESETS[key]
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -4, 0, buttonHeight)
+        btn.Size = UDim2.new(1, -4, 0, btnHeight)
         btn.Position = UDim2.new(0, 2, 0, yPos)
-        btn.BackgroundColor3 = preset.bg or Color3.fromRGB(20, 16, 35)
+        btn.BackgroundColor3 = Color3.fromRGB(20, 16, 35)
         btn.BackgroundTransparency = 0.2
-        btn.Text = preset.name
+        btn.Text = presetColor.name
         btn.TextColor3 = Color3.fromRGB(200, 190, 220)
         btn.TextSize = 14
         btn.Font = Enum.Font.Jura
         btn.TextXAlignment = Enum.TextXAlignment.Left
         btn.Parent = container
-        
+
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(0, 6)
         btnCorner.Parent = btn
-        
-        -- Индикатор выбранного цвета (белая галочка или точка)
+
+        -- Индикатор выбранного цвета (белая галочка)
         local indicator = Instance.new("TextLabel")
-        indicator.Size = UDim2.new(0, 20, 0, 20)
-        indicator.Position = UDim2.new(1, -25, 0.5, -10)
+        indicator.Size = UDim2.new(0, 25, 0, 25)
+        indicator.Position = UDim2.new(1, -30, 0.5, -12.5)
         indicator.BackgroundTransparency = 1
         indicator.Text = "✓"
         indicator.TextColor3 = Color3.fromRGB(255, 255, 255)
-        indicator.TextSize = 16
+        indicator.TextSize = 18
         indicator.Font = Enum.Font.Jura
         indicator.TextXAlignment = Enum.TextXAlignment.Center
         indicator.TextYAlignment = Enum.TextYAlignment.Center
-        indicator.Visible = (key == currentSelected)
+        indicator.Visible = (key == selectedKey)
         indicator.Parent = btn
-        
-        -- Сохраняем ссылку на индикатор в кнопке
+
         btn.Indicator = indicator
-        
+
         btn.Activated:Connect(function()
-            -- Применяем цвет
             ChangeColor(key)
-            currentSelected = key
-            
+            selectedKey = key
+
             -- Обновляем все индикаторы
             for _, child in ipairs(container:GetChildren()) do
                 if child:IsA("TextButton") and child.Indicator then
@@ -1071,12 +1076,41 @@ local function CreateColorTable()
                 end
             end
             indicator.Visible = true
+
+            -- Обновляем градиент обводки таблицы
+            local newPreset = COLOR_PRESETS[key]
+            if newPreset and strokeGradient then
+                local newGradSeq = {}
+                for _, point in ipairs(newPreset.gradient) do
+                    table.insert(newGradSeq, ColorSequenceKeypoint.new(point[1], point[2]))
+                end
+                strokeGradient.Color = ColorSequence.new(newGradSeq)
+            end
         end)
-        
-        yPos = yPos + buttonHeight + spacing
+
+        yPos = yPos + btnHeight + spacing
     end
-    
+
     container.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
+
+    -- Закрытие по клику вне таблицы (для мобильных)
+    local function onInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            local pos = input.Position
+            local absPos = mainFrame.AbsolutePosition
+            local size = mainFrame.AbsoluteSize
+            if not (pos.X >= absPos.X and pos.X <= absPos.X + size.X and
+                    pos.Y >= absPos.Y and pos.Y <= absPos.Y + size.Y) then
+                if ColorTableGui then
+                    ColorTableGui:Destroy()
+                    ColorTableGui = nil
+                    ColorTableOpen = false
+                end
+                UserInputService.InputBegan:Disconnect(onInputBegan)
+            end
+        end
+    end
+    UserInputService.InputBegan:Connect(onInputBegan)
 end
 
 -- ═══════════════════════════════════════════════════════════
