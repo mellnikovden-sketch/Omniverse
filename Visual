@@ -4101,7 +4101,7 @@ local function trailColorSeq(style, color, color2)
 		})
 	elseif style == "Rainbow-Galaxy" then
 		-- handled dynamically by rainbow loop; fallback gradient
-		return ColorSequence.new({ color, c2, color })
+		return ColorSequence.new({ ColorSequenceKeypoint.new(0, color), ColorSequenceKeypoint.new(0.5, c2), ColorSequenceKeypoint.new(1, color) })
 	elseif style == "Toxic-Slime" then
 		return ColorSequence.new({
 			ColorSequenceKeypoint.new(0,   Color3.fromRGB(180, 255, 60)),
@@ -4123,7 +4123,7 @@ local function trailColorSeq(style, color, color2)
 		})
 	elseif style == "Rainbow-Dual" then
 		-- handled dynamically by rainbow loop; fallback gradient
-		return ColorSequence.new({ color, c2, color })
+		return ColorSequence.new({ ColorSequenceKeypoint.new(0, color), ColorSequenceKeypoint.new(0.5, c2), ColorSequenceKeypoint.new(1, color) })
 	else -- Neon / Rainbow: яркая вспышка → основной цвет → мягкий переход
 		return ColorSequence.new({
 			ColorSequenceKeypoint.new(0,   lighten(color, 0.3)),
@@ -4288,9 +4288,9 @@ local function buildTrails()
 			trailHue = (trailHue + dt * 0.4) % 1
 			local c = Color3.fromHSV(trailHue, 0.9, 1)
 			local c2 = Color3.fromHSV((trailHue + 0.5) % 1, 0.9, 1)
-			trail.Color = ColorSequence.new({ c, c2 })
+			trail.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, c), ColorSequenceKeypoint.new(1, c2) })
 			if style == "Rainbow-Dual" and trail2 then
-				trail2.Color = ColorSequence.new({ c2, c })
+				trail2.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, c2), ColorSequenceKeypoint.new(1, c) })
 			end
 		end)
 	end
@@ -5099,7 +5099,7 @@ local function buildWindow()
     window.Name = "MainWindow"
     window.AnchorPoint = Vector2.new(0.5, 0.5)
     window.Position = UDim2.new(0.5, 0, 0.5, 0)
-    window.Size = UDim2.new(0, IS_PHONE and 340 or 560, 0, IS_PHONE and 400 or 400)
+    window.Size = UDim2.new(0, IS_PHONE and 380 or 720, 0, IS_PHONE and 460 or 480)
     window.BackgroundColor3 = THEME.Background
     window.BackgroundTransparency = 0.02
     window.BorderSizePixel = 0
@@ -5181,7 +5181,7 @@ local function buildWindow()
     local sidebarY = 46
     sidebar = Instance.new("Frame")
     sidebar.Name = "Sidebar"
-    sidebar.Size = UDim2.new(0, IS_PHONE and 90 or 140, 1, -sidebarY - 10)
+    sidebar.Size = UDim2.new(0, IS_PHONE and 100 or 170, 1, -sidebarY - 10)
     sidebar.Position = UDim2.new(0, 10, 0, sidebarY)
     sidebar.BackgroundColor3 = THEME.Sidebar
     sidebar.BackgroundTransparency = 0.1
@@ -5227,8 +5227,8 @@ local function buildWindow()
     -- ── CONTENT AREA ──
     local contentArea = Instance.new("Frame")
     contentArea.Name = "ContentArea"
-    contentArea.Size = UDim2.new(1, -(IS_PHONE and 100 or 150) - 10, 1, -sidebarY - 10)
-    contentArea.Position = UDim2.new(0, IS_PHONE and 105 or 155, 0, sidebarY)
+    contentArea.Size = UDim2.new(1, -(IS_PHONE and 110 or 180) - 10, 1, -sidebarY - 10)
+    contentArea.Position = UDim2.new(0, IS_PHONE and 115 or 185, 0, sidebarY)
     contentArea.BackgroundTransparency = 1
     contentArea.ZIndex = 101
     contentArea.Parent = window
@@ -5371,7 +5371,7 @@ local function createSection(name, icon)
         if type(default) == "function" then callback = default; default = false end
 
         local row = Instance.new("TextButton")
-        row.Size = UDim2.new(1, 0, 0, 38)
+        row.Size = UDim2.new(1, 0, 0, 44)
         row.BackgroundColor3 = THEME.Element
         row.BackgroundTransparency = 0.1
         row.BorderSizePixel = 0
@@ -5602,7 +5602,7 @@ local function createSection(name, icon)
         local currentValue = default or options[1]
 
         local row = Instance.new("TextButton")
-        row.Size = UDim2.new(1, 0, 0, 38)
+        row.Size = UDim2.new(1, 0, 0, 44)
         row.BackgroundColor3 = THEME.Element
         row.BackgroundTransparency = 0.1
         row.BorderSizePixel = 0
@@ -5655,19 +5655,24 @@ local function createSection(name, icon)
         local backdrop
 
         local function closeDropdown()
-            if dropdownFrame then
-                local t = tween(dropdownFrame, { Size = UDim2.new(0, dropdownFrame.AbsoluteSize.X, 0, 0), Position = UDim2.new(0, dropdownFrame.AbsolutePosition.X, 0, dropdownFrame.AbsolutePosition.Y + dropdownFrame.AbsoluteSize.Y * 0.3) }, 0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
-                t.Completed:Wait()
-                if dropdownFrame then dropdownFrame:Destroy() dropdownFrame = nil end
-            end
-            if backdrop then
-                tween(backdrop, { BackgroundTransparency = 1 }, 0.15)
-                task.delay(0.16, function()
-                    if backdrop then backdrop:Destroy() backdrop = nil end
-                end)
-            end
             dropdownOpen = false
             tween(arrow, { TextColor3 = THEME.TextDim, Rotation = 0 }, 0.15)
+            if dropdownFrame then
+                local df = dropdownFrame
+                dropdownFrame = nil
+                tween(df, { Size = UDim2.new(0, df.AbsoluteSize.X, 0, 0) }, 0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
+                task.delay(0.16, function()
+                    if df then df:Destroy() end
+                end)
+            end
+            if backdrop then
+                local bd = backdrop
+                backdrop = nil
+                tween(bd, { BackgroundTransparency = 1 }, 0.15)
+                task.delay(0.16, function()
+                    if bd then bd:Destroy() end
+                end)
+            end
         end
 
         row.Activated:Connect(function()
@@ -5697,8 +5702,8 @@ local function createSection(name, icon)
             end)
 
             -- ── Popup window (separate, on ScreenGui, above everything) ──
-            local popupWidth = math.max(rowSize.X, 180)
-            local popupHeight = math.min(#options * 28 + 8, 220)
+            local popupWidth = math.max(rowSize.X, 200)
+            local popupHeight = math.min(#options * 32 + 8, 240)
 
             -- Calculate position: below the row, but flip above if near bottom
             local popX = rowPos.X
@@ -5751,7 +5756,7 @@ local function createSection(name, icon)
 
             for _, option in ipairs(options) do
                 local item = Instance.new("TextButton")
-                item.Size = UDim2.new(1, 0, 0, 26)
+                item.Size = UDim2.new(1, 0, 0, 30)
                 item.BackgroundColor3 = (option == currentValue) and THEME.ElementHover or THEME.DropdownBg
                 item.Text = ""
                 item.AutoButtonColor = false
@@ -5792,11 +5797,13 @@ local function createSection(name, icon)
                     tween(item, { BackgroundColor3 = (option == currentValue) and THEME.ElementHover or THEME.DropdownBg }, 0.1)
                 end)
 
-                item.Activated:Connect(function()
-                    currentValue = option
-                    valLbl.Text = tostring(option)
-                    if callback then task.spawn(function() callback(option) end) end
-                    closeDropdown()
+                item.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        currentValue = option
+                        valLbl.Text = tostring(option)
+                        if callback then task.spawn(function() callback(option) end) end
+                        closeDropdown()
+                    end
                 end)
             end
 
@@ -5816,7 +5823,7 @@ local function createSection(name, icon)
     -- ════════ ADD COLORPICKER ═══════════════════════════════════════════
     function section:AddColorpicker(label, defaultColor, callback)
         local row = Instance.new("TextButton")
-        row.Size = UDim2.new(1, 0, 0, 38)
+        row.Size = UDim2.new(1, 0, 0, 44)
         row.BackgroundColor3 = THEME.Element
         row.BackgroundTransparency = 0.1
         row.BorderSizePixel = 0
@@ -5859,15 +5866,20 @@ local function createSection(name, icon)
 
         local function closePicker()
             if pickerBackdrop then
-                tween(pickerBackdrop, { BackgroundTransparency = 1 }, 0.15)
+                local bd = pickerBackdrop
+                pickerBackdrop = nil
+                tween(bd, { BackgroundTransparency = 1 }, 0.15)
                 task.delay(0.16, function()
-                    if pickerBackdrop then pickerBackdrop:Destroy() pickerBackdrop = nil end
+                    if bd then bd:Destroy() end
                 end)
             end
             if pickerFrame then
-                local t = tween(pickerFrame, { Size = UDim2.new(0, 220, 0, 0), Position = UDim2.new(0.5, -110, 0.5, 0) }, 0.18, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
-                t.Completed:Wait()
-                if pickerFrame then pickerFrame:Destroy() pickerFrame = nil end
+                local pf = pickerFrame
+                pickerFrame = nil
+                tween(pf, { Size = UDim2.new(0, 220, 0, 0) }, 0.18, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
+                task.delay(0.19, function()
+                    if pf then pf:Destroy() end
+                end)
             end
         end
 
@@ -5932,16 +5944,21 @@ local function createSection(name, icon)
             satGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0))
             satGrad.Parent = svArea
 
-            -- Value gradient overlay
+            -- Value gradient overlay (transparent so clicks pass through to svArea)
             local valOverlay = Instance.new("Frame")
             valOverlay.Size = UDim2.new(1, 0, 1, 0)
             valOverlay.BackgroundTransparency = 1
             valOverlay.ZIndex = 652
+            valOverlay.Active = false
             valOverlay.Parent = svArea
 
             local valGrad = Instance.new("UIGradient")
-            valGrad.Color = ColorSequence.new(Color3.fromRGB(0,0,0,0), Color3.fromRGB(0,0,0,255))
+            valGrad.Color = ColorSequence.new(Color3.new(0,0,0), Color3.new(0,0,0))
             valGrad.Rotation = 90
+            valGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(1, 0),
+            })
             valGrad.Parent = valOverlay
 
             -- Hue slider
@@ -5963,7 +5980,15 @@ local function createSection(name, icon)
                 Color3.fromRGB(255, 0, 0),
             }
             local hueGrad = Instance.new("UIGradient")
-            hueGrad.Color = ColorSequence.new(hueColors)
+            hueGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0,    Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                ColorSequenceKeypoint.new(1,    Color3.fromRGB(255, 0, 0)),
+            })
             hueGrad.Parent = hueBar
 
             local h, s, v = 0, 1, 1
@@ -5980,52 +6005,63 @@ local function createSection(name, icon)
                 if callback then task.spawn(function() callback(col) end) end
             end
 
-            -- SV area interaction
+            -- SV area interaction (works with both mouse and touch)
             local svDragging = false
-            svArea.MouseButton1Down:Connect(function()
-                svDragging = true
-                local mp = UserInputService:GetMouseLocation()
+            local function updateSVFromInput(input)
+                local mp = input.Position
                 local ap = svArea.AbsolutePosition
                 local as = svArea.AbsoluteSize
                 s = math.clamp((mp.X - ap.X) / as.X, 0, 1)
                 v = 1 - math.clamp((mp.Y - ap.Y) / as.Y, 0, 1)
                 updateColor()
+            end
+            svArea.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    svDragging = true
+                    updateSVFromInput(input)
+                end
+            end)
+            svArea.InputChanged:Connect(function(input)
+                if svDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    updateSVFromInput(input)
+                end
             end)
             UserInputService.InputChanged:Connect(function(input)
                 if svDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    local mp = UserInputService:GetMouseLocation()
-                    local ap = svArea.AbsolutePosition
-                    local as = svArea.AbsoluteSize
-                    s = math.clamp((mp.X - ap.X) / as.X, 0, 1)
-                    v = 1 - math.clamp((mp.Y - ap.Y) / as.Y, 0, 1)
-                    updateColor()
+                    updateSVFromInput(input)
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then svDragging = false end
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then svDragging = false end
             end)
 
-            -- Hue interaction
+            -- Hue interaction (works with both mouse and touch)
             local hueDragging = false
-            hueBar.MouseButton1Down:Connect(function()
-                hueDragging = true
-                local mp = UserInputService:GetMouseLocation()
+            local function updateHueFromInput(input)
+                local mp = input.Position
                 local ap = hueBar.AbsolutePosition
                 local as = hueBar.AbsoluteSize
                 h = math.clamp((mp.X - ap.X) / as.X, 0, 1)
                 updateColor()
+            end
+            hueBar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    hueDragging = true
+                    updateHueFromInput(input)
+                end
+            end)
+            hueBar.InputChanged:Connect(function(input)
+                if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    updateHueFromInput(input)
+                end
             end)
             UserInputService.InputChanged:Connect(function(input)
                 if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    local mp = UserInputService:GetMouseLocation()
-                    local ap = hueBar.AbsolutePosition
-                    local as = hueBar.AbsoluteSize
-                    h = math.clamp((mp.X - ap.X) / as.X, 0, 1)
-                    updateColor()
+                    updateHueFromInput(input)
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then hueDragging = false end
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then hueDragging = false end
             end)
 
             -- Close button
@@ -6228,8 +6264,9 @@ function SharedAPI.Notify(text, duration)
     notify(text, duration)
 end
 
--- ── SharedAPI is now available to the code below ─────────────────────
--- (return SharedAPI removed — we're inlined, not a module)
+-- ── RETURN ────────────────────────────────────────────────────────────
+-- (return SharedAPI removed - we are inlined, not a module)
+
 
 local shared = SharedAPI  -- Crystal Hub Modern UI (replaces odh_shared_plugins)
 
