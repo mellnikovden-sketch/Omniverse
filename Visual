@@ -2639,14 +2639,22 @@ local function ensureAuraLoop()
                         local ringR = cfg.Radius * 1.4 * pulse
                         local ringY = base.Y - 2.8
                         for _, rp in ipairs(auraRingParts) do
+                                if not rp.part or rp.part.Parent == nil then
+                                        goto skipRing
+                                end
                                 local a = rp.angle + t * 0.5
                                 local pos = base + Vector3.new(math.cos(a) * ringR, ringY, math.sin(a) * ringR)
                                 rp.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, a + math.rad(90), 0)
                                 rp.part.Transparency = 0.15 + math.sin(t * 3 + rp.angle * 3) * 0.1
+                                ::skipRing::
                         end
                 end
                 -- анимация частиц
                 for _, item in ipairs(auraParts) do
+                        if not item.part or item.part.Parent == nil then
+                                -- частица уже удалена (респавн / clearAura) — пропускаем
+                                goto skipItem
+                        end
                         if item.layer == 3 then
                                 -- Rising spark: поднимается снизу вверх и исчезает
                                 local cycle = (t * item.riseSpeed + item.riseOffset) % 4
@@ -2693,6 +2701,7 @@ local function ensureAuraLoop()
                                         item.part.Size = Vector3.new(item.sizeVar, item.sizeVar, item.sizeVar) * pulse
                                 end
                         end
+                        ::skipItem::
                 end
         end)
 end
@@ -3413,17 +3422,20 @@ local function ensureSoulPetLoop()
                         -- мерцающие искры
                         if petExtra.sparks then
                                 for k, sp in ipairs(petExtra.sparks) do
+                                        if not sp or sp.Parent == nil then goto skipSpark end
                                         local a = t * 2 + (k / #petExtra.sparks) * math.pi * 2
                                         local r = cfg.Size * 1.3
                                         local sp2 = pos + Vector3.new(math.cos(a) * r, math.sin(t * 3 + k) * 0.6, math.sin(a) * r)
                                         sp.CFrame = CFrame.new(sp2)
                                         sp.Transparency = 0.2 + math.sin(t * 6 + k) * 0.25
+                                        ::skipSpark::
                                 end
                         end
 
                 elseif style == "Dragonling" and petExtra.tail then
                         -- Dragonling: tail segments trail behind the orb
                         for i, tp in ipairs(petExtra.tail) do
+                                if not tp or tp.Parent == nil then goto skipTail end
                                 local lag = i * 0.08
                                 local a = angle - lag
                                 local tpos = pos + Vector3.new(
@@ -3432,11 +3444,13 @@ local function ensureSoulPetLoop()
                                         -math.sin(angle) * i * 0.2
                                 )
                                 tp.CFrame = CFrame.new(tpos)
+                                ::skipTail::
                         end
 
                 elseif style == "Eye of God" and petExtra.rings then
                         -- Eye of God: rotating halo rings around the orb on different axes
                         for _, ringData in ipairs(petExtra.rings) do
+                                if not ringData.part or ringData.part.Parent == nil then goto skipRing end
                                 local rot = t * ringData.speed
                                 if ringData.axis == 1 then
                                         ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(rot, 0, 0)
@@ -3445,9 +3459,10 @@ local function ensureSoulPetLoop()
                                 else
                                         ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, rot)
                                 end
+                                ::skipRing::
                         end
 
-                elseif style == "Companion Cube" and petExtra.core then
+                elseif style == "Companion Cube" and petExtra.core and petExtra.core.Parent then
                         -- Companion Cube: pulsing core heart inside the cube
                         local pulse = 1 + math.sin(t * 4) * 0.15
                         petExtra.core.CFrame = CFrame.new(pos) * CFrame.Angles(t * 0.5, t * 0.7, 0)
@@ -5653,9 +5668,12 @@ local function createSection(name, icon)
         local dropdownOpen = false
         local dropdownFrame
         local backdrop
+        local closeConn
 
         local function closeDropdown()
+            if not dropdownOpen then return end
             dropdownOpen = false
+            if closeConn then closeConn:Disconnect() closeConn = nil end
             tween(arrow, { TextColor3 = THEME.TextDim, Rotation = 0 }, 0.15)
             if dropdownFrame then
                 local df = dropdownFrame
@@ -5685,21 +5703,16 @@ local function createSection(name, icon)
             local rowSize = row.AbsoluteSize
             local vp = workspace.CurrentCamera.ViewportSize
 
-            -- ── Backdrop (dim everything behind popup) ──
-            backdrop = Instance.new("TextButton")
+            -- ── Backdrop (Frame, NOT TextButton — doesn't steal touch events) ──
+            backdrop = Instance.new("Frame")
             backdrop.Size = UDim2.new(1, 0, 1, 0)
             backdrop.Position = UDim2.new(0, 0, 0, 0)
             backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             backdrop.BackgroundTransparency = 1
             backdrop.BorderSizePixel = 0
-            backdrop.Text = ""
-            backdrop.AutoButtonColor = false
             backdrop.ZIndex = 600
             backdrop.Parent = g
             tween(backdrop, { BackgroundTransparency = 0.4 }, 0.15)
-            backdrop.Activated:Connect(function()
-                closeDropdown()
-            end)
 
             -- ── Popup window (separate, on ScreenGui, above everything) ──
             local popupWidth = math.max(rowSize.X, 200)
@@ -5720,7 +5733,7 @@ local function createSection(name, icon)
             dropdownFrame = Instance.new("Frame")
             dropdownFrame.Name = "DropdownPopup"
             dropdownFrame.Size = UDim2.new(0, popupWidth, 0, 0)
-            dropdownFrame.Position = UDim2.new(0, popX, 0, popY + 10)  -- start slightly below for animation
+            dropdownFrame.Position = UDim2.new(0, popX, 0, popY + 10)
             dropdownFrame.BackgroundColor3 = THEME.DropdownBg
             dropdownFrame.BorderSizePixel = 0
             dropdownFrame.ZIndex = 650
@@ -5739,7 +5752,7 @@ local function createSection(name, icon)
             local scrollFrame = Instance.new("ScrollingFrame")
             scrollFrame.Size = UDim2.new(1, 0, 1, 0)
             scrollFrame.BackgroundTransparency = 1
-            scrollFrame.ScrollBarThickness = 3
+            scrollFrame.ScrollBarThickness = 4
             scrollFrame.ScrollBarImageColor3 = THEME.Border
             scrollFrame.ScrollBarImageTransparency = 0.4
             scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -5790,25 +5803,38 @@ local function createSection(name, icon)
                     check.Parent = item
                 end
 
-                item.MouseEnter:Connect(function()
-                    tween(item, { BackgroundColor3 = THEME.ElementHover }, 0.1)
-                end)
-                item.MouseLeave:Connect(function()
-                    tween(item, { BackgroundColor3 = (option == currentValue) and THEME.ElementHover or THEME.DropdownBg }, 0.1)
-                end)
-
-                item.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        currentValue = option
-                        valLbl.Text = tostring(option)
-                        if callback then task.spawn(function() callback(option) end) end
-                        closeDropdown()
-                    end
+                -- Use Activated — most reliable on both mouse and touch
+                item.Activated:Connect(function()
+                    currentValue = option
+                    valLbl.Text = tostring(option)
+                    if callback then task.spawn(function() callback(option) end) end
+                    closeDropdown()
                 end)
             end
 
             -- Animate popup open
             tween(dropdownFrame, { Size = UDim2.new(0, popupWidth, 0, popupHeight), Position = UDim2.new(0, popX, 0, popY) }, 0.18, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+            -- Close when clicking/tapping OUTSIDE the popup (using UserInputService)
+            -- This doesn't interfere with item clicks because we check coordinates
+            task.wait(0.2) -- wait for animation to start so we don't catch the opening tap
+            closeConn = UserInputService.InputBegan:Connect(function(input, processed)
+                if dropdownOpen and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                    local pos = input.Position
+                    local dfPos = dropdownFrame and dropdownFrame.AbsolutePosition
+                    local dfSize = dropdownFrame and dropdownFrame.AbsoluteSize
+                    if dfPos and dfSize then
+                        -- Check if click is inside the popup
+                        if pos.X >= dfPos.X and pos.X <= dfPos.X + dfSize.X
+                           and pos.Y >= dfPos.Y and pos.Y <= dfPos.Y + dfSize.Y then
+                            -- Click inside popup, do nothing (item will handle it)
+                            return
+                        end
+                    end
+                    -- Click outside popup → close
+                    closeDropdown()
+                end
+            end)
         end)
 
         local ddObj = {}
@@ -5860,11 +5886,11 @@ local function createSection(name, icon)
 
         local currentColor = defaultColor or Color3.fromRGB(255, 255, 255)
         local pickerFrame
-
-        local pickerFrame
         local pickerBackdrop
+        local pickerCloseConn
 
         local function closePicker()
+            if pickerCloseConn then pickerCloseConn:Disconnect() pickerCloseConn = nil end
             if pickerBackdrop then
                 local bd = pickerBackdrop
                 pickerBackdrop = nil
@@ -5891,21 +5917,16 @@ local function createSection(name, icon)
 
             local g = getGui()
 
-            -- ── Backdrop dim ──
-            pickerBackdrop = Instance.new("TextButton")
+            -- ── Backdrop dim (Frame, NOT TextButton — doesn't steal touch) ──
+            pickerBackdrop = Instance.new("Frame")
             pickerBackdrop.Size = UDim2.new(1, 0, 1, 0)
             pickerBackdrop.Position = UDim2.new(0, 0, 0, 0)
             pickerBackdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             pickerBackdrop.BackgroundTransparency = 1
             pickerBackdrop.BorderSizePixel = 0
-            pickerBackdrop.Text = ""
-            pickerBackdrop.AutoButtonColor = false
             pickerBackdrop.ZIndex = 600
             pickerBackdrop.Parent = g
             tween(pickerBackdrop, { BackgroundTransparency = 0.4 }, 0.15)
-            pickerBackdrop.Activated:Connect(function()
-                closePicker()
-            end)
 
             pickerFrame = Instance.new("Frame")
             pickerFrame.Size = UDim2.new(0, 220, 0, 0)
@@ -5927,7 +5948,7 @@ local function createSection(name, icon)
             -- Animate in
             tween(pickerFrame, { Size = UDim2.new(0, 220, 0, 195), Position = UDim2.new(0.5, -110, 0.5, -97) }, 0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
-            -- SV picker area
+            -- SV picker area (TextButton so it receives InputBegan)
             local svArea = Instance.new("TextButton")
             svArea.Size = UDim2.new(0, 200, 0, 120)
             svArea.Position = UDim2.new(0, 10, 0, 10)
@@ -5939,12 +5960,17 @@ local function createSection(name, icon)
             svArea.Parent = pickerFrame
             corner(svArea, UDim.new(0, 4))
 
-            -- Saturation gradient
+            -- Saturation gradient (white → transparent, left → right)
             local satGrad = Instance.new("UIGradient")
-            satGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0))
+            satGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255))
+            satGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(1, 1),
+            })
             satGrad.Parent = svArea
 
-            -- Value gradient overlay (transparent so clicks pass through to svArea)
+            -- Value gradient overlay (black, bottom → top, transparent → opaque)
+            -- Using a separate Frame with Active=false so it doesn't block clicks
             local valOverlay = Instance.new("Frame")
             valOverlay.Size = UDim2.new(1, 0, 1, 0)
             valOverlay.BackgroundTransparency = 1
@@ -5963,7 +5989,7 @@ local function createSection(name, icon)
 
             -- Hue slider
             local hueBar = Instance.new("TextButton")
-            hueBar.Size = UDim2.new(0, 200, 0, 14)
+            hueBar.Size = UDim2.new(0, 200, 0, 16)
             hueBar.Position = UDim2.new(0, 10, 0, 140)
             hueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             hueBar.BorderSizePixel = 0
@@ -5973,12 +5999,6 @@ local function createSection(name, icon)
             hueBar.Parent = pickerFrame
             corner(hueBar, UDim.new(0, 7))
 
-            local hueColors = {
-                Color3.fromRGB(255, 0, 0), Color3.fromRGB(255, 255, 0),
-                Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 255, 255),
-                Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 0, 255),
-                Color3.fromRGB(255, 0, 0),
-            }
             local hueGrad = Instance.new("UIGradient")
             hueGrad.Color = ColorSequence.new({
                 ColorSequenceKeypoint.new(0,    Color3.fromRGB(255, 0, 0)),
@@ -5991,10 +6011,36 @@ local function createSection(name, icon)
             })
             hueGrad.Parent = hueBar
 
-            local h, s, v = 0, 1, 1
+            -- SV cursor indicator
+            local svCursor = Instance.new("Frame")
+            svCursor.Size = UDim2.new(0, 8, 0, 8)
+            svCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            svCursor.BorderSizePixel = 0
+            svCursor.ZIndex = 655
+            svCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            svCursor.Position = UDim2.new(1, 0, 0, 0)
+            svCursor.Parent = svArea
+            corner(svCursor, UDim.new(0, 4))
+            stroke(svCursor, Color3.fromRGB(0, 0, 0), 1, 0)
+
+            -- Hue cursor indicator
+            local hueCursor = Instance.new("Frame")
+            hueCursor.Size = UDim2.new(0, 4, 0, 20)
+            hueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            hueCursor.BorderSizePixel = 0
+            hueCursor.ZIndex = 655
+            hueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            hueCursor.Position = UDim2.new(0, 0, 0.5, 0)
+            hueCursor.Parent = hueBar
+            corner(hueCursor, UDim.new(0, 2))
+            stroke(hueCursor, Color3.fromRGB(0, 0, 0), 1, 0)
+
+            -- Initialize HSV from current color
+            local h, s, v = Color3.toHSV(currentColor)
+            if h == 0 and s == 0 and v == 1 then h = 0; s = 1; v = 1 end
+
             local function hsvToColor(hue, sat, val)
-                local c = Color3.fromHSV(hue, sat, val)
-                return c
+                return Color3.fromHSV(hue, sat, val)
             end
 
             local function updateColor()
@@ -6002,10 +6048,12 @@ local function createSection(name, icon)
                 currentColor = col
                 cBtn.BackgroundColor3 = col
                 svArea.BackgroundColor3 = hsvToColor(h, 1, 1)
+                svCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+                hueCursor.Position = UDim2.new(h, 0, 0.5, 0)
                 if callback then task.spawn(function() callback(col) end) end
             end
 
-            -- SV area interaction (works with both mouse and touch)
+            -- SV area interaction (mouse + touch)
             local svDragging = false
             local function updateSVFromInput(input)
                 local mp = input.Position
@@ -6021,21 +6069,20 @@ local function createSection(name, icon)
                     updateSVFromInput(input)
                 end
             end)
-            svArea.InputChanged:Connect(function(input)
+            local svMoveConn
+            svMoveConn = UserInputService.InputChanged:Connect(function(input)
                 if svDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                     updateSVFromInput(input)
                 end
             end)
-            UserInputService.InputChanged:Connect(function(input)
-                if svDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    updateSVFromInput(input)
+            local svEndConn
+            svEndConn = UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    svDragging = false
                 end
-            end)
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then svDragging = false end
             end)
 
-            -- Hue interaction (works with both mouse and touch)
+            -- Hue interaction (mouse + touch)
             local hueDragging = false
             local function updateHueFromInput(input)
                 local mp = input.Position
@@ -6050,24 +6097,33 @@ local function createSection(name, icon)
                     updateHueFromInput(input)
                 end
             end)
-            hueBar.InputChanged:Connect(function(input)
+            local hueMoveConn
+            hueMoveConn = UserInputService.InputChanged:Connect(function(input)
                 if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                     updateHueFromInput(input)
                 end
             end)
-            UserInputService.InputChanged:Connect(function(input)
-                if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    updateHueFromInput(input)
+            local hueEndConn
+            hueEndConn = UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    hueDragging = false
                 end
             end)
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then hueDragging = false end
-            end)
+
+            -- Clean up move/end connections when picker closes
+            local origClose = closePicker
+            closePicker = function()
+                if svMoveConn then svMoveConn:Disconnect() svMoveConn = nil end
+                if svEndConn then svEndConn:Disconnect() svEndConn = nil end
+                if hueMoveConn then hueMoveConn:Disconnect() hueMoveConn = nil end
+                if hueEndConn then hueEndConn:Disconnect() hueEndConn = nil end
+                origClose()
+            end
 
             -- Close button
             local closeBtn = Instance.new("TextButton")
-            closeBtn.Size = UDim2.new(0, 200, 0, 22)
-            closeBtn.Position = UDim2.new(0, 10, 0, 160)
+            closeBtn.Size = UDim2.new(0, 200, 0, 24)
+            closeBtn.Position = UDim2.new(0, 10, 0, 162)
             closeBtn.BackgroundColor3 = THEME.Element
             closeBtn.BorderSizePixel = 0
             closeBtn.Text = "Close"
@@ -6080,6 +6136,27 @@ local function createSection(name, icon)
             corner(closeBtn, THEME.CornerSm)
             closeBtn.Activated:Connect(function()
                 closePicker()
+            end)
+
+            -- Initial update to position cursors
+            updateColor()
+
+            -- Close when tapping outside (using UserInputService, not backdrop)
+            task.wait(0.2)
+            pickerCloseConn = UserInputService.InputBegan:Connect(function(input, processed)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    if svDragging or hueDragging then return end -- don't close while dragging
+                    local pos = input.Position
+                    local pfPos = pickerFrame and pickerFrame.AbsolutePosition
+                    local pfSize = pickerFrame and pickerFrame.AbsoluteSize
+                    if pfPos and pfSize then
+                        if pos.X >= pfPos.X and pos.X <= pfPos.X + pfSize.X
+                           and pos.Y >= pfPos.Y and pos.Y <= pfPos.Y + pfSize.Y then
+                            return -- inside picker, do nothing
+                        end
+                    end
+                    closePicker()
+                end
             end)
         end)
 
@@ -6265,8 +6342,6 @@ function SharedAPI.Notify(text, duration)
 end
 
 -- ── RETURN ────────────────────────────────────────────────────────────
--- (return SharedAPI removed - we are inlined, not a module)
-
 
 local shared = SharedAPI  -- Crystal Hub Modern UI (replaces odh_shared_plugins)
 
