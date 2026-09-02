@@ -1,3 +1,8 @@
+-- ====================================================================== --
+--            CRYSTAL HUB VISUALS — ULTIMATE EDITION (STANDALONE)         --
+--         Полный набор визуалов, сенсорный GUI и перетаскиваемая кнопка   --
+-- ====================================================================== --
+
 if not game:IsLoaded() then
 	pcall(function() game.Loaded:Wait() end)
 end
@@ -18,14 +23,14 @@ local function detectPhone()
 end
 
 local IS_PHONE = detectPhone()
-local QUALITY = IS_PHONE and 0.7 or 1
+local QUALITY = IS_PHONE and 0.75 or 1
 
 local function quantity(count, minimum)
 	return math.max(minimum or 1, math.floor(count * QUALITY + 0.5))
 end
 
 --======================================================================--
---                      СПИСКИ ВСЕХ ДОСТУПНЫХ СТИЛЕЙ                    --
+--                      СПИСКИ СТИЛЕЙ И ПРЕСЕТОВ                        --
 --======================================================================--
 local Visuals = {}
 
@@ -57,8 +62,58 @@ Visuals.SoulPetStyles = {
 	"Star", "Butterfly", "Phoenix", "Wisp",
 }
 
+Visuals.TrailStyles = {
+	"Neon", "Rainbow", "Fire", "Comet", "Pastel", "Dark", "Crystal", "Candy",
+	"Galaxy", "Phoenix", "Nebula", "Rainbow-Galaxy",
+	"Toxic-Slime", "Rainbow-Dual", "Vortex", "Ghost-Trail",
+}
+
+Visuals.KillStyles = {
+	"Explosion", "Shards", "Hearts", "Stars", "Sparkle",
+	"Ghost", "Diamond", "Skull", "Soul-Drain", "Black-Hole",
+}
+
 local COLOR_TARGETS = { "Jump", "Wings", "Halo", "Hat", "Trails", "KillFX" }
 local currentColorTarget = "Wings"
+
+local COLOR_PRESETS = {
+	{ name = "Obsidian",        icon = "🪨", colors = { Color3.fromRGB(60,40,120),  Color3.fromRGB(120,80,200),  Color3.fromRGB(80,60,160),  Color3.fromRGB(40,30,100),  Color3.fromRGB(60,40,120)  } },
+	{ name = "Gold",            icon = "✨", colors = { Color3.fromRGB(200,150,20), Color3.fromRGB(255,215,0),   Color3.fromRGB(200,150,20), Color3.fromRGB(150,100,10), Color3.fromRGB(200,150,20) } },
+	{ name = "Neon",            icon = "💜", colors = { Color3.fromRGB(150,20,200), Color3.fromRGB(200,50,255),  Color3.fromRGB(150,20,200), Color3.fromRGB(100,10,150), Color3.fromRGB(150,20,200) } },
+	{ name = "Cyber",           icon = "💠", colors = { Color3.fromRGB(0,100,200),  Color3.fromRGB(0,200,255),   Color3.fromRGB(0,100,200),  Color3.fromRGB(0,50,150),   Color3.fromRGB(0,100,200)  } },
+	{ name = "Crimson",         icon = "❤️", colors = { Color3.fromRGB(200,20,20),  Color3.fromRGB(255,50,50),   Color3.fromRGB(200,20,20),  Color3.fromRGB(150,10,10),  Color3.fromRGB(200,20,20)  } },
+	{ name = "Emerald",         icon = "💚", colors = { Color3.fromRGB(20,200,60),  Color3.fromRGB(50,255,100),  Color3.fromRGB(20,200,60),  Color3.fromRGB(10,150,40),  Color3.fromRGB(20,200,60)  } },
+	{ name = "Ocean",           icon = "🌊", colors = { Color3.fromRGB(20,80,200),  Color3.fromRGB(50,150,255),  Color3.fromRGB(20,80,200),  Color3.fromRGB(10,50,150),  Color3.fromRGB(20,80,200)  } },
+	{ name = "Sunset",          icon = "🌅", colors = { Color3.fromRGB(200,80,20),  Color3.fromRGB(255,150,50),  Color3.fromRGB(200,80,20),  Color3.fromRGB(150,50,10),  Color3.fromRGB(200,80,20)  } },
+	{ name = "Platinum",        icon = "⚪", colors = { Color3.fromRGB(120,120,160),Color3.fromRGB(200,200,220), Color3.fromRGB(120,120,160),Color3.fromRGB(80,80,120),  Color3.fromRGB(120,120,160) } },
+	{ name = "Ice",             icon = "❄️", colors = { Color3.fromRGB(80,180,220), Color3.fromRGB(150,220,255), Color3.fromRGB(80,180,220), Color3.fromRGB(40,120,180), Color3.fromRGB(80,180,220) } },
+	{ name = "Lava",            icon = "🌋", colors = { Color3.fromRGB(200,50,0),   Color3.fromRGB(255,100,20),  Color3.fromRGB(200,50,0),   Color3.fromRGB(150,30,0),   Color3.fromRGB(200,50,0)   } },
+	{ name = "Dark",            icon = "🌑", colors = { Color3.fromRGB(50,50,70),   Color3.fromRGB(100,100,120), Color3.fromRGB(50,50,70),   Color3.fromRGB(30,30,50),   Color3.fromRGB(50,50,70)   } },
+	{ name = "Electric Purple", icon = "💜", colors = { Color3.fromRGB(157,0,255),  Color3.fromRGB(120,0,200),   Color3.fromRGB(80,0,150),   Color3.fromRGB(46,10,78),   Color3.fromRGB(157,0,255)  } },
+	{ name = "Monochrome",      icon = "⚫", colors = { Color3.fromRGB(255,255,255),Color3.fromRGB(169,169,169), Color3.fromRGB(100,100,100),Color3.fromRGB(30,30,30),   Color3.fromRGB(255,255,255) } },
+	{ name = "Cosmic Red",      icon = "❤️", colors = { Color3.fromRGB(255,0,60),   Color3.fromRGB(200,0,50),    Color3.fromRGB(128,0,32),   Color3.fromRGB(26,0,10),    Color3.fromRGB(255,0,60)   } },
+	{ name = "Cosmic Blue",     icon = "💙", colors = { Color3.fromRGB(0,100,255),  Color3.fromRGB(0,70,200),    Color3.fromRGB(0,26,102),   Color3.fromRGB(0,11,51),    Color3.fromRGB(0,102,255)  } },
+	{ name = "Amethyst",        icon = "💎", colors = { Color3.fromRGB(200,150,255),Color3.fromRGB(160,100,220), Color3.fromRGB(120,60,180), Color3.fromRGB(80,30,120),  Color3.fromRGB(200,150,255) } },
+	{ name = "Slate Gray",      icon = "🛻", colors = { Color3.fromRGB(200,200,210),Color3.fromRGB(169,169,169), Color3.fromRGB(120,120,130),Color3.fromRGB(60,60,70),   Color3.fromRGB(200,200,210) } },
+	{ name = "Midnight Blue",   icon = "🌙", colors = { Color3.fromRGB(80,150,255), Color3.fromRGB(50,100,200),  Color3.fromRGB(20,50,120),  Color3.fromRGB(0,10,30),    Color3.fromRGB(80,150,255) } },
+	{ name = "Toxic",           icon = "☢️", colors = { Color3.fromRGB(100,255,0),  Color3.fromRGB(160,255,60),  Color3.fromRGB(80,200,0),   Color3.fromRGB(40,140,0),   Color3.fromRGB(100,255,0)  } },
+	{ name = "Mint",            icon = "🍃", colors = { Color3.fromRGB(100,255,200),Color3.fromRGB(150,255,220), Color3.fromRGB(80,220,180), Color3.fromRGB(50,170,140), Color3.fromRGB(100,255,200) } },
+	{ name = "Rose Gold",       icon = "🌹", colors = { Color3.fromRGB(255,183,178),Color3.fromRGB(255,210,200), Color3.fromRGB(230,160,155),Color3.fromRGB(200,130,125),Color3.fromRGB(255,183,178) } },
+	{ name = "Aurora",          icon = "🌌", colors = { Color3.fromRGB(0,255,150),  Color3.fromRGB(100,200,255), Color3.fromRGB(180,100,255),Color3.fromRGB(255,100,200),Color3.fromRGB(0,255,150)  } },
+	{ name = "Blood Moon",      icon = "🩸", colors = { Color3.fromRGB(120,0,0),    Color3.fromRGB(200,30,30),   Color3.fromRGB(255,60,40),  Color3.fromRGB(150,10,10),  Color3.fromRGB(120,0,0)    } },
+	{ name = "Void",            icon = "🕳️", colors = { Color3.fromRGB(20,0,40),    Color3.fromRGB(60,0,120),    Color3.fromRGB(120,0,200),  Color3.fromRGB(40,0,80),    Color3.fromRGB(20,0,40)    } },
+	{ name = "Sakura",          icon = "🌸", colors = { Color3.fromRGB(255,182,203),Color3.fromRGB(255,105,180), Color3.fromRGB(200,80,120), Color3.fromRGB(255,192,203),Color3.fromRGB(255,182,203) } },
+	{ name = "Ocean Deep",      icon = "🌊", colors = { Color3.fromRGB(0,30,80),    Color3.fromRGB(0,80,160),   Color3.fromRGB(0,140,220),  Color3.fromRGB(0,20,60),    Color3.fromRGB(0,30,80)    } },
+	{ name = "Volcanic",        icon = "🌋", colors = { Color3.fromRGB(255,60,0),   Color3.fromRGB(255,140,0),  Color3.fromRGB(200,40,0),   Color3.fromRGB(80,20,0),    Color3.fromRGB(255,60,0)   } },
+	{ name = "Neon Lime",       icon = "🟢", colors = { Color3.fromRGB(180,255,0), Color3.fromRGB(120,255,80), Color3.fromRGB(80,220,40),  Color3.fromRGB(40,160,20),  Color3.fromRGB(180,255,0)  } },
+	{ name = "Cosmic Dust",     icon = "🌀", colors = { Color3.fromRGB(120,60,200),Color3.fromRGB(200,100,255),Color3.fromRGB(255,120,200),Color3.fromRGB(60,40,120), Color3.fromRGB(120,60,200) } },
+	{ name = "Rainbow Glitter", icon = "🌈", colors = { Color3.fromRGB(255,0,128), Color3.fromRGB(255,200,0),  Color3.fromRGB(0,255,128),  Color3.fromRGB(0,128,255),  Color3.fromRGB(255,0,128)  } },
+}
+
+local PRESET_NAMES = {}
+for _, preset in ipairs(COLOR_PRESETS) do
+	table.insert(PRESET_NAMES, preset.icon .. " " .. preset.name)
+end
 
 --======================================================================--
 --                      НАСТРОЙКИ ВИЗУАЛОВ                              --
@@ -111,45 +166,6 @@ Visuals.Settings = {
 }
 
 local vis = Visuals.Settings
-
-local COLOR_PRESETS = {
-	{ name = "Obsidian",        icon = "🪨", colors = { Color3.fromRGB(60,40,120),  Color3.fromRGB(120,80,200),  Color3.fromRGB(80,60,160),  Color3.fromRGB(40,30,100),  Color3.fromRGB(60,40,120)  } },
-	{ name = "Gold",            icon = "✨", colors = { Color3.fromRGB(200,150,20), Color3.fromRGB(255,215,0),   Color3.fromRGB(200,150,20), Color3.fromRGB(150,100,10), Color3.fromRGB(200,150,20) } },
-	{ name = "Neon",            icon = "💜", colors = { Color3.fromRGB(150,20,200), Color3.fromRGB(200,50,255),  Color3.fromRGB(150,20,200), Color3.fromRGB(100,10,150), Color3.fromRGB(150,20,200) } },
-	{ name = "Cyber",           icon = "💠", colors = { Color3.fromRGB(0,100,200),  Color3.fromRGB(0,200,255),   Color3.fromRGB(0,100,200),  Color3.fromRGB(0,50,150),   Color3.fromRGB(0,100,200)  } },
-	{ name = "Crimson",         icon = "❤️", colors = { Color3.fromRGB(200,20,20),  Color3.fromRGB(255,50,50),   Color3.fromRGB(200,20,20),  Color3.fromRGB(150,10,10),  Color3.fromRGB(200,20,20)  } },
-	{ name = "Emerald",         icon = "💚", colors = { Color3.fromRGB(20,200,60),  Color3.fromRGB(50,255,100),  Color3.fromRGB(20,200,60),  Color3.fromRGB(10,150,40),  Color3.fromRGB(20,200,60)  } },
-	{ name = "Ocean",           icon = "🌊", colors = { Color3.fromRGB(20,80,200),  Color3.fromRGB(50,150,255),  Color3.fromRGB(20,80,200),  Color3.fromRGB(10,50,150),  Color3.fromRGB(20,80,200)  } },
-	{ name = "Sunset",          icon = "🌅", colors = { Color3.fromRGB(200,80,20),  Color3.fromRGB(255,150,50),  Color3.fromRGB(200,80,20),  Color3.fromRGB(150,50,10),  Color3.fromRGB(200,80,20)  } },
-	{ name = "Platinum",        icon = "⚪", colors = { Color3.fromRGB(120,120,160),Color3.fromRGB(200,200,220), Color3.fromRGB(120,120,160),Color3.fromRGB(80,80,120),  Color3.fromRGB(120,120,160) } },
-	{ name = "Ice",             icon = "❄️", colors = { Color3.fromRGB(80,180,220), Color3.fromRGB(150,220,255), Color3.fromRGB(80,180,220), Color3.fromRGB(40,120,180), Color3.fromRGB(80,180,220) } },
-	{ name = "Lava",            icon = "🌋", colors = { Color3.fromRGB(200,50,0),   Color3.fromRGB(255,100,20),  Color3.fromRGB(200,50,0),   Color3.fromRGB(150,30,0),   Color3.fromRGB(200,50,0)   } },
-	{ name = "Dark",            icon = "🌑", colors = { Color3.fromRGB(50,50,70),   Color3.fromRGB(100,100,120), Color3.fromRGB(50,50,70),   Color3.fromRGB(30,30,50),   Color3.fromRGB(50,50,70)   } },
-	{ name = "Electric Purple", icon = "💜", colors = { Color3.fromRGB(157,0,255),  Color3.fromRGB(120,0,200),   Color3.fromRGB(80,0,150),   Color3.fromRGB(46,10,78),   Color3.fromRGB(157,0,255)  } },
-	{ name = "Monochrome",      icon = "⚫", colors = { Color3.fromRGB(255,255,255),Color3.fromRGB(169,169,169), Color3.fromRGB(100,100,100),Color3.fromRGB(30,30,30),   Color3.fromRGB(255,255,255) } },
-	{ name = "Cosmic Red",      icon = "❤️", colors = { Color3.fromRGB(255,0,60),   Color3.fromRGB(200,0,50),    Color3.fromRGB(128,0,32),   Color3.fromRGB(26,0,10),    Color3.fromRGB(255,0,60)   } },
-	{ name = "Cosmic Blue",     icon = "💙", colors = { Color3.fromRGB(0,100,255),  Color3.fromRGB(0,70,200),    Color3.fromRGB(0,26,102),   Color3.fromRGB(0,11,51),    Color3.fromRGB(0,102,255)  } },
-	{ name = "Amethyst",        icon = "💎", colors = { Color3.fromRGB(200,150,255),Color3.fromRGB(160,100,220), Color3.fromRGB(120,60,180), Color3.fromRGB(80,30,120),  Color3.fromRGB(200,150,255) } },
-	{ name = "Slate Gray",      icon = "🛻", colors = { Color3.fromRGB(200,200,210),Color3.fromRGB(169,169,169), Color3.fromRGB(120,120,130),Color3.fromRGB(60,60,70),   Color3.fromRGB(200,200,210) } },
-	{ name = "Midnight Blue",   icon = "🌙", colors = { Color3.fromRGB(80,150,255), Color3.fromRGB(50,100,200),  Color3.fromRGB(20,50,120),  Color3.fromRGB(0,10,30),    Color3.fromRGB(80,150,255) } },
-	{ name = "Toxic",           icon = "☢️", colors = { Color3.fromRGB(100,255,0),  Color3.fromRGB(160,255,60),  Color3.fromRGB(80,200,0),   Color3.fromRGB(40,140,0),   Color3.fromRGB(100,255,0)  } },
-	{ name = "Mint",            icon = "🍃", colors = { Color3.fromRGB(100,255,200),Color3.fromRGB(150,255,220), Color3.fromRGB(80,220,180), Color3.fromRGB(50,170,140), Color3.fromRGB(100,255,200) } },
-	{ name = "Rose Gold",       icon = "🌹", colors = { Color3.fromRGB(255,183,178),Color3.fromRGB(255,210,200), Color3.fromRGB(230,160,155),Color3.fromRGB(200,130,125),Color3.fromRGB(255,183,178) } },
-	{ name = "Aurora",          icon = "🌌", colors = { Color3.fromRGB(0,255,150),  Color3.fromRGB(100,200,255), Color3.fromRGB(180,100,255),Color3.fromRGB(255,100,200),Color3.fromRGB(0,255,150)  } },
-	{ name = "Blood Moon",      icon = "🩸", colors = { Color3.fromRGB(120,0,0),    Color3.fromRGB(200,30,30),   Color3.fromRGB(255,60,40),  Color3.fromRGB(150,10,10),  Color3.fromRGB(120,0,0)    } },
-	{ name = "Void",            icon = "🕳️", colors = { Color3.fromRGB(20,0,40),    Color3.fromRGB(60,0,120),    Color3.fromRGB(120,0,200),  Color3.fromRGB(40,0,80),    Color3.fromRGB(20,0,40)    } },
-	{ name = "Sakura",          icon = "🌸", colors = { Color3.fromRGB(255,182,203),Color3.fromRGB(255,105,180), Color3.fromRGB(200,80,120), Color3.fromRGB(255,192,203),Color3.fromRGB(255,182,203) } },
-	{ name = "Ocean Deep",      icon = "🌊", colors = { Color3.fromRGB(0,30,80),    Color3.fromRGB(0,80,160),   Color3.fromRGB(0,140,220),  Color3.fromRGB(0,20,60),    Color3.fromRGB(0,30,80)    } },
-	{ name = "Volcanic",        icon = "🌋", colors = { Color3.fromRGB(255,60,0),   Color3.fromRGB(255,140,0),  Color3.fromRGB(200,40,0),   Color3.fromRGB(80,20,0),    Color3.fromRGB(255,60,0)   } },
-	{ name = "Neon Lime",       icon = "🟢", colors = { Color3.fromRGB(180,255,0), Color3.fromRGB(120,255,80), Color3.fromRGB(80,220,40),  Color3.fromRGB(40,160,20),  Color3.fromRGB(180,255,0)  } },
-	{ name = "Cosmic Dust",     icon = "🌀", colors = { Color3.fromRGB(120,60,200),Color3.fromRGB(200,100,255),Color3.fromRGB(255,120,200),Color3.fromRGB(60,40,120), Color3.fromRGB(120,60,200) } },
-	{ name = "Rainbow Glitter", icon = "🌈", colors = { Color3.fromRGB(255,0,128), Color3.fromRGB(255,200,0),  Color3.fromRGB(0,255,128),  Color3.fromRGB(0,128,255),  Color3.fromRGB(255,0,128)  } },
-}
-
-local PRESET_NAMES = {}
-for _, preset in ipairs(COLOR_PRESETS) do
-	table.insert(PRESET_NAMES, preset.icon .. " " .. preset.name)
-end
 
 --======================================================================--
 --                      ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ                         --
@@ -380,7 +396,7 @@ end
 local function playJumpEffect()
 	if not vis.Jump.Enabled or not torso then return end
 	local now = os.clock()
-	if now - lastJumpEffect < 0.15 then return end
+	if now - lastJumpEffect < 0.12 then return end
 	lastJumpEffect = now
 
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -451,6 +467,29 @@ local function playJumpEffect()
 			Color = color, Duration = duration * 0.9, Segments = 34,
 			Radius0 = size * 0.3, Radius1 = size * 1.3, Thickness = size * 0.025, Fade = 0.05,
 		})
+	elseif style == "Galaxy" then
+		for arm = 0, 1 do
+			spawnArcRing(origin, {
+				Color = arm == 0 and color or lighten(color, 0.3),
+				Duration = duration * 1.3, Segments = 28,
+				Sweep = math.rad(200), Start = arm * math.pi,
+				Radius0 = size * 0.15, Radius1 = size * 1.1,
+				Thickness = size * 0.04, Spin = arm == 0 and 1.8 or -1.8,
+				Rise = 0.3, Fade = 0.25,
+			})
+		end
+		spawnSparks(origin, color, duration, 16, size * 0.7)
+	elseif style == "Phoenix" then
+		for _, side in ipairs({ -1, 1 }) do
+			spawnArcRing(origin, {
+				Color = color, Duration = duration * 1.2, Segments = 22,
+				Sweep = math.rad(130), Start = side > 0 and math.rad(-65) or math.rad(115),
+				Radius0 = size * 0.12, Radius1 = size * 1.25,
+				Thickness = size * 0.07, Spin = side * 0.5, Tilt = math.rad(28),
+				Rise = 1.6, Fade = 0.45,
+			})
+		end
+		spawnSparks(origin, color, duration * 1.5, 20, size * 1.0)
 	else
 		-- Swirl
 		spawnArcRing(origin, {
@@ -558,10 +597,10 @@ local function buildWings()
 	local pc    = vis.Wings.PresetColors
 	local function colAt(ratio) return presetColorAt(pc, base, ratio) end
 
-	local function addOrb(side, angle, dist, height, sz, col, transp)
+	local function addOrb(side, angle, dist, height, sz, col)
 		local orb = newNeonPart(Vector3.new(sz, sz, sz), col, "Part")
 		orb.Shape = Enum.PartType.Ball
-		orb.Transparency = transp or 0.08
+		orb.Transparency = 0.08
 		orb.Parent = wingsFolder
 		local cf = CFrame.new(0, height * scale, 0) * CFrame.Angles(0, side * angle, 0) * CFrame.new(0, 0, -dist * scale)
 		weldTo(torso, orb, cf)
@@ -569,7 +608,7 @@ local function buildWings()
 	end
 
 	for _, side in ipairs({ -1, 1 }) do
-		if style == "Demon" then
+		if style == "Demon" or style == "Dragon" then
 			local bones = quantity(7, 5)
 			for index = 1, bones do
 				local ratio  = (index - 1) / (bones - 1)
@@ -583,9 +622,9 @@ local function buildWings()
 					Phase = index * 0.28, Amp = 0.1 + ratio * 0.12, Tip = true, TipColor = dark,
 				})
 			end
-			addOrb(side, math.rad(70), 0.6, 0.15, 0.18 * scale, colAt(0.9), 0.05)
+			addOrb(side, math.rad(70), 0.6, 0.15, 0.18 * scale, colAt(0.9))
 
-		elseif style == "Phantom" then
+		elseif style == "Phantom" or style == "Void" then
 			for index = 1, quantity(7, 5) do
 				local ratio  = (index - 1) / 6
 				local blade = addFeather(side, {
@@ -611,7 +650,7 @@ local function buildWings()
 				if index <= 3 then addTrail(shard, colAt(0.9), 0.5, 1.8) end
 			end
 
-		elseif style == "Butterfly" then
+		elseif style == "Butterfly" or style == "Fairy" then
 			for index = 1, quantity(6, 4) do
 				local ratio = (index - 1) / 5
 				local wing = addFeather(side, {
@@ -740,6 +779,9 @@ local function buildHalo()
 	elseif style == "Tilted" then
 		smoothRing(0.95, 1.6, 24, math.rad(25), 1, 0.08)
 		smoothRing(0.75, 1.8, 18, math.rad(-35), -1, 0.06)
+	elseif style == "Star" or style == "Crown" or style == "Lotus" then
+		smoothRing(0.85, 1.5, 24, 0, 1, 0.08)
+		orbitOrbs(6, 0.95, 1.7, 0.2)
 	else
 		-- Ring
 		smoothRing(0.9, 1.6, 26, 0, 1, 0.07)
@@ -758,7 +800,7 @@ local function buildHalo()
 end
 
 --======================================================================--
---                      ОТРИСОВКА ШЛЯПЫ (ВСЕ 10 СТИЛЕЙ)                 --
+--                      ОТРИСОВКА ШЛЯПЫ (CHINA HAT)                     --
 --======================================================================--
 local function clearChinaHat()
 	if hatFolder then hatFolder:Destroy() end
@@ -1050,9 +1092,9 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = parentGui
 
--- Плавающая кнопка 🔮
+-- 🔮 ПЛАВАЮЩАЯ КНОПКА (С ПОДДЕРЖКОЙ ПЕРЕТАСКИВАНИЯ)
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 46, 0, 46)
+ToggleBtn.Size = UDim2.new(0, 48, 0, 48)
 ToggleBtn.Position = UDim2.new(0, 15, 0.45, 0)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 42)
 ToggleBtn.Text = "🔮"
@@ -1064,6 +1106,33 @@ ToggleBtn.Parent = ScreenGui
 local btnCorner = Instance.new("UICorner") btnCorner.CornerRadius = UDim.new(1, 0) btnCorner.Parent = ToggleBtn
 local btnStroke = Instance.new("UIStroke") btnStroke.Color = Color3.fromRGB(140, 100, 255) btnStroke.Thickness = 1.8 btnStroke.Parent = ToggleBtn
 
+-- Логика перетаскивания и клика для кнопки 🔮
+local btnDragging = false
+local btnDragStart, btnStartPos
+local btnMoved = false
+
+ToggleBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		btnDragging = true
+		btnMoved = false
+		btnDragStart = input.Position
+		btnStartPos = ToggleBtn.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if btnDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - btnDragStart
+		if delta.Magnitude > 4 then
+			btnMoved = true
+			ToggleBtn.Position = UDim2.new(
+				btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X,
+				btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y
+			)
+		end
+	end
+end)
+
 -- Главное окно
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, IS_PHONE and 420 or 520, 0, IS_PHONE and 310 or 370)
@@ -1072,6 +1141,17 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
+
+ToggleBtn.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if btnDragging then
+			btnDragging = false
+			if not btnMoved then
+				MainFrame.Visible = not MainFrame.Visible
+			end
+		end
+	end
+end)
 
 local mainCorner = Instance.new("UICorner") mainCorner.CornerRadius = UDim.new(0, 12) mainCorner.Parent = MainFrame
 local mainStroke = Instance.new("UIStroke") mainStroke.Color = Color3.fromRGB(90, 70, 160) mainStroke.Thickness = 1.2 mainStroke.Parent = MainFrame
@@ -1088,7 +1168,7 @@ titleLbl.Size = UDim2.new(1, -50, 1, 0)
 titleLbl.Position = UDim2.new(0, 12, 0, 0)
 titleLbl.BackgroundTransparency = 1
 titleLbl.Font = Enum.Font.GothamBold
-titleLbl.Text = "✨ Crystal Hub — Visuals (Full Fixed)"
+titleLbl.Text = "✨ Crystal Hub — Visuals (Fixed Edition)"
 titleLbl.TextColor3 = Color3.fromRGB(230, 230, 255)
 titleLbl.TextSize = 14
 titleLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1105,9 +1185,8 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = TitleBar
 
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
-ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
 
--- Перетаскивание (Drag & Drop)
+-- Перетаскивание главного окна
 local dragging, dragStart, startPos
 TitleBar.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1146,28 +1225,28 @@ ContentArea.Position = UDim2.new(0, 115, 0, 38)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
--- Модальное окно выбора из выпадающего списка
+-- Модальное окно выбора из списка (Dropdown Modal)
 local ModalOverlay = Instance.new("Frame")
 ModalOverlay.Size = UDim2.new(1, 0, 1, 0)
 ModalOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-ModalOverlay.BackgroundTransparency = 0.5
+ModalOverlay.BackgroundTransparency = 0.4
 ModalOverlay.Visible = false
 ModalOverlay.ZIndex = 50
 ModalOverlay.Parent = MainFrame
 
 local ModalBox = Instance.new("Frame")
-ModalBox.Size = UDim2.new(0, 260, 0, 220)
-ModalBox.Position = UDim2.new(0.5, -130, 0.5, -110)
+ModalBox.Size = UDim2.new(0, 270, 0, 230)
+ModalBox.Position = UDim2.new(0.5, -135, 0.5, -115)
 ModalBox.BackgroundColor3 = Color3.fromRGB(20, 22, 34)
 ModalBox.BorderSizePixel = 0
 ModalBox.ZIndex = 51
 ModalBox.Parent = ModalOverlay
 
 local mCorner = Instance.new("UICorner") mCorner.CornerRadius = UDim.new(0, 8) mCorner.Parent = ModalBox
-local mStroke = Instance.new("UIStroke") mStroke.Color = Color3.fromRGB(120, 90, 255) mStroke.Thickness = 1 mStroke.Parent = ModalBox
+local mStroke = Instance.new("UIStroke") mStroke.Color = Color3.fromRGB(130, 90, 255) mStroke.Thickness = 1.2 mStroke.Parent = ModalBox
 
 local ModalTitle = Instance.new("TextLabel")
-ModalTitle.Size = UDim2.new(1, -30, 0, 30)
+ModalTitle.Size = UDim2.new(1, -30, 0, 32)
 ModalTitle.Position = UDim2.new(0, 10, 0, 0)
 ModalTitle.BackgroundTransparency = 1
 ModalTitle.Font = Enum.Font.GothamBold
@@ -1180,7 +1259,7 @@ ModalTitle.Parent = ModalBox
 
 local ModalClose = Instance.new("TextButton")
 ModalClose.Size = UDim2.new(0, 26, 0, 26)
-ModalClose.Position = UDim2.new(1, -28, 0, 2)
+ModalClose.Position = UDim2.new(1, -28, 0, 3)
 ModalClose.BackgroundTransparency = 1
 ModalClose.Text = "✕"
 ModalClose.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -1192,8 +1271,8 @@ ModalClose.Parent = ModalBox
 ModalClose.MouseButton1Click:Connect(function() ModalOverlay.Visible = false end)
 
 local ModalScroll = Instance.new("ScrollingFrame")
-ModalScroll.Size = UDim2.new(1, -12, 1, -38)
-ModalScroll.Position = UDim2.new(0, 6, 0, 32)
+ModalScroll.Size = UDim2.new(1, -12, 1, -40)
+ModalScroll.Position = UDim2.new(0, 6, 0, 34)
 ModalScroll.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
 ModalScroll.BorderSizePixel = 0
 ModalScroll.ScrollBarThickness = 3
@@ -1209,7 +1288,7 @@ local function openDropdownModal(title, options, currentVal, onSelect)
 		if child:IsA("TextButton") then child:Destroy() end
 	end
 
-	for _, opt in ipairs(options) do
+	for _, opt in ipairs(options or {}) do
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(1, -6, 0, 28)
 		btn.BackgroundColor3 = (opt == currentVal) and Color3.fromRGB(90, 70, 180) or Color3.fromRGB(24, 26, 42)
@@ -1536,21 +1615,10 @@ addDropdown(pageColors, "Preset -> Target", PRESET_NAMES, PRESET_NAMES[1], funct
 	for _, preset in ipairs(COLOR_PRESETS) do
 		if preset.icon .. " " .. preset.name == v then
 			local color = preset.colors[2] or preset.colors[1]
-			if currentColorTarget == "Jump" then
-				vis.Jump.Color = color
-				vis.Jump.PresetColors = preset.colors
-			elseif currentColorTarget == "Wings" then
-				vis.Wings.Color = color
-				vis.Wings.PresetColors = preset.colors
-				if vis.Wings.Enabled then buildWings() end
-			elseif currentColorTarget == "Halo" then
-				vis.Halo.Color = color
-				vis.Halo.PresetColors = preset.colors
-				if vis.Halo.Enabled then buildHalo() end
-			elseif currentColorTarget == "Hat" then
-				vis.ChinaHat.Color = color
-				vis.ChinaHat.PresetColors = preset.colors
-				if vis.ChinaHat.Enabled then buildChinaHat() end
+			if currentColorTarget == "Jump" then vis.Jump.Color = color vis.Jump.PresetColors = preset.colors
+			elseif currentColorTarget == "Wings" then vis.Wings.Color = color vis.Wings.PresetColors = preset.colors if vis.Wings.Enabled then buildWings() end
+			elseif currentColorTarget == "Halo" then vis.Halo.Color = color vis.Halo.PresetColors = preset.colors if vis.Halo.Enabled then buildHalo() end
+			elseif currentColorTarget == "Hat" then vis.ChinaHat.Color = color vis.ChinaHat.PresetColors = preset.colors if vis.ChinaHat.Enabled then buildChinaHat() end
 			end
 			break
 		end
@@ -1561,14 +1629,10 @@ addDropdown(pageColors, "Preset -> ВСЕ Визуалы", PRESET_NAMES, PRESET_
 	for _, preset in ipairs(COLOR_PRESETS) do
 		if preset.icon .. " " .. preset.name == v then
 			local color = preset.colors[2] or preset.colors[1]
-			vis.Jump.Color = color
-			vis.Jump.PresetColors = preset.colors
-			vis.Wings.Color = color
-			vis.Wings.PresetColors = preset.colors
-			vis.Halo.Color = color
-			vis.Halo.PresetColors = preset.colors
-			vis.ChinaHat.Color = color
-			vis.ChinaHat.PresetColors = preset.colors
+			vis.Jump.Color = color vis.Jump.PresetColors = preset.colors
+			vis.Wings.Color = color vis.Wings.PresetColors = preset.colors
+			vis.Halo.Color = color vis.Halo.PresetColors = preset.colors
+			vis.ChinaHat.Color = color vis.ChinaHat.PresetColors = preset.colors
 			vis.Extra.Glow.Color = color
 			vis.Extra.SoulPet.Color = color
 			if vis.Wings.Enabled then buildWings() end
