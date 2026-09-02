@@ -1,0 +1,1184 @@
+-- ====================================================================== --
+--              CRYSTAL HUB VISUALS — STANDALONE EDITION                  --
+--                 (Работает в ЛЮБОМ инжекторе / без API)                 --
+-- ====================================================================== --
+
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+local function detectPhone()
+	if not UserInputService.TouchEnabled then return false end
+	if UserInputService.KeyboardEnabled then return false end
+	return true
+end
+
+local IS_PHONE = detectPhone()
+local QUALITY = IS_PHONE and 0.6 or 1
+
+local function quantity(count, minimum)
+	return math.max(minimum or 1, math.floor(count * QUALITY + 0.5))
+end
+
+--======================================================================--
+--                      ВИЗУАЛЫ ПЕРСОНАЖА (НАСТРОЙКИ)                   --
+--======================================================================--
+local Visuals = {}
+
+Visuals.Settings = {
+	Jump = {
+		Enabled  = false,
+		Style    = "Swirl",
+		Color    = Color3.fromRGB(120, 190, 255),
+		Size     = 7,
+		Duration = 0.7,
+		Flash    = true,
+		Sparks   = true,
+		PresetColors = nil,
+	},
+	Wings = {
+		Enabled = false,
+		Style   = "Angel",
+		Color   = Color3.fromRGB(150, 200, 255),
+		Scale   = 1,
+		Droop   = 0,
+		Flap    = true,
+		Glow    = true,
+		PresetColors = nil,
+	},
+	Halo = {
+		Enabled = false,
+		Style   = "Ring",
+		Color   = Color3.fromRGB(255, 225, 130),
+		Speed   = 1,
+		Glow    = true,
+		PresetColors = nil,
+	},
+	ChinaHat = {
+		Enabled = false,
+		Style   = "Layered",
+		Color   = Color3.fromRGB(255, 120, 90),
+		Size    = 1,
+		Spin    = 0,
+		Glow    = true,
+		PresetColors = nil,
+	},
+	Extra = {
+		Glow        = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Range = 12, Brightness = 2, Pulse = true, ColorShift = true },
+		Aura        = { Enabled = false, Color = Color3.fromRGB(180, 130, 255), Count = 6, Radius = 3, Height = 2, Speed = 1.2, Shape = "Mixed" },
+		Footprints  = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Interval = 0.25, Size = 0.9, Duration = 1.5, Sparks = true },
+		IdleSpin    = { Enabled = false, Speed = 0.8, Wobble = true },
+		SoulPet     = { Enabled = false, Color = Color3.fromRGB(120, 255, 200), Size = 0.5, Distance = 3, Height = 3, Speed = 1.0, Style = "Orb" },
+	},
+}
+
+local vis = Visuals.Settings
+
+--======================================================================--
+--                      СИСТЕМА ПРЕСЕТОВ ЦВЕТА                          --
+--======================================================================--
+local COLOR_PRESETS = {
+	{ name = "Obsidian",        icon = "🪨", colors = { Color3.fromRGB(60,40,120),  Color3.fromRGB(120,80,200),  Color3.fromRGB(80,60,160),  Color3.fromRGB(40,30,100),  Color3.fromRGB(60,40,120)  } },
+	{ name = "Gold",            icon = "✨", colors = { Color3.fromRGB(200,150,20), Color3.fromRGB(255,215,0),   Color3.fromRGB(200,150,20), Color3.fromRGB(150,100,10), Color3.fromRGB(200,150,20) } },
+	{ name = "Neon",            icon = "💜", colors = { Color3.fromRGB(150,20,200), Color3.fromRGB(200,50,255),  Color3.fromRGB(150,20,200), Color3.fromRGB(100,10,150), Color3.fromRGB(150,20,200) } },
+	{ name = "Cyber",           icon = "💠", colors = { Color3.fromRGB(0,100,200),  Color3.fromRGB(0,200,255),   Color3.fromRGB(0,100,200),  Color3.fromRGB(0,50,150),   Color3.fromRGB(0,100,200)  } },
+	{ name = "Crimson",         icon = "❤️", colors = { Color3.fromRGB(200,20,20),  Color3.fromRGB(255,50,50),   Color3.fromRGB(200,20,20),  Color3.fromRGB(150,10,10),  Color3.fromRGB(200,20,20)  } },
+	{ name = "Emerald",         icon = "💚", colors = { Color3.fromRGB(20,200,60),  Color3.fromRGB(50,255,100),  Color3.fromRGB(20,200,60),  Color3.fromRGB(10,150,40),  Color3.fromRGB(20,200,60)  } },
+	{ name = "Ocean",           icon = "🌊", colors = { Color3.fromRGB(20,80,200),  Color3.fromRGB(50,150,255),  Color3.fromRGB(20,80,200),  Color3.fromRGB(10,50,150),  Color3.fromRGB(20,80,200)  } },
+	{ name = "Sunset",          icon = "🌅", colors = { Color3.fromRGB(200,80,20),  Color3.fromRGB(255,150,50),  Color3.fromRGB(200,80,20),  Color3.fromRGB(150,50,10),  Color3.fromRGB(200,80,20)  } },
+	{ name = "Platinum",        icon = "⚪", colors = { Color3.fromRGB(120,120,160),Color3.fromRGB(200,200,220), Color3.fromRGB(120,120,160),Color3.fromRGB(80,80,120),  Color3.fromRGB(120,120,160) } },
+	{ name = "Ice",             icon = "❄️", colors = { Color3.fromRGB(80,180,220), Color3.fromRGB(150,220,255), Color3.fromRGB(80,180,220), Color3.fromRGB(40,120,180), Color3.fromRGB(80,180,220) } },
+	{ name = "Lava",            icon = "🌋", colors = { Color3.fromRGB(200,50,0),   Color3.fromRGB(255,100,20),  Color3.fromRGB(200,50,0),   Color3.fromRGB(150,30,0),   Color3.fromRGB(200,50,0)   } },
+	{ name = "Dark",            icon = "🌑", colors = { Color3.fromRGB(50,50,70),   Color3.fromRGB(100,100,120), Color3.fromRGB(50,50,70),   Color3.fromRGB(30,30,50),   Color3.fromRGB(50,50,70)   } },
+	{ name = "Electric Purple", icon = "💜", colors = { Color3.fromRGB(157,0,255),  Color3.fromRGB(120,0,200),   Color3.fromRGB(80,0,150),   Color3.fromRGB(46,10,78),   Color3.fromRGB(157,0,255)  } },
+	{ name = "Monochrome",      icon = "⚫", colors = { Color3.fromRGB(255,255,255),Color3.fromRGB(169,169,169), Color3.fromRGB(100,100,100),Color3.fromRGB(30,30,30),   Color3.fromRGB(255,255,255) } },
+	{ name = "Cosmic Red",      icon = "❤️", colors = { Color3.fromRGB(255,0,60),   Color3.fromRGB(200,0,50),    Color3.fromRGB(128,0,32),   Color3.fromRGB(26,0,10),    Color3.fromRGB(255,0,60)   } },
+	{ name = "Cosmic Blue",     icon = "💙", colors = { Color3.fromRGB(0,102,255),  Color3.fromRGB(0,70,200),    Color3.fromRGB(0,26,102),   Color3.fromRGB(0,11,51),    Color3.fromRGB(0,102,255)  } },
+	{ name = "Amethyst",        icon = "💎", colors = { Color3.fromRGB(200,150,255),Color3.fromRGB(160,100,220), Color3.fromRGB(120,60,180), Color3.fromRGB(80,30,120),  Color3.fromRGB(200,150,255) } },
+	{ name = "Midnight Blue",   icon = "🌙", colors = { Color3.fromRGB(80,150,255), Color3.fromRGB(50,100,200),  Color3.fromRGB(20,50,120),  Color3.fromRGB(0,10,30),    Color3.fromRGB(80,150,255) } },
+	{ name = "Toxic",           icon = "☢️", colors = { Color3.fromRGB(100,255,0),  Color3.fromRGB(160,255,60),  Color3.fromRGB(80,200,0),   Color3.fromRGB(40,140,0),   Color3.fromRGB(100,255,0)  } },
+	{ name = "Aurora",          icon = "🌌", colors = { Color3.fromRGB(0,255,150),  Color3.fromRGB(100,200,255), Color3.fromRGB(180,100,255),Color3.fromRGB(255,100,200),Color3.fromRGB(0,255,150)  } },
+	{ name = "Blood Moon",      icon = "🩸", colors = { Color3.fromRGB(120,0,0),    Color3.fromRGB(200,30,30),   Color3.fromRGB(255,60,40),  Color3.fromRGB(150,10,10),  Color3.fromRGB(120,0,0)    } },
+	{ name = "Sakura",          icon = "🌸", colors = { Color3.fromRGB(255,182,203),Color3.fromRGB(255,105,180), Color3.fromRGB(200,80,120), Color3.fromRGB(255,192,203),Color3.fromRGB(255,182,203) } },
+	{ name = "Volcanic",        icon = "🌋", colors = { Color3.fromRGB(255,60,0),   Color3.fromRGB(255,140,0),  Color3.fromRGB(200,40,0),   Color3.fromRGB(80,20,0),    Color3.fromRGB(255,60,0)   } },
+	{ name = "Rainbow Glitter", icon = "🌈", colors = { Color3.fromRGB(255,0,128), Color3.fromRGB(255,200,0),  Color3.fromRGB(0,255,128),  Color3.fromRGB(0,128,255),  Color3.fromRGB(255,0,128)  } },
+}
+
+local function buildRainbowColorSequence(hue)
+	local keypoints = {}
+	for i = 0, 4 do
+		local h = (hue + i * 0.12) % 1
+		local color = Color3.fromHSV(h, 0.9, 1)
+		table.insert(keypoints, ColorSequenceKeypoint.new(i / 4, color))
+	end
+	return ColorSequence.new(keypoints)
+end
+
+local function rainbowColor(hue)
+	return Color3.fromHSV(hue % 1, 0.9, 1)
+end
+
+local animFx = {
+	rainbow = {
+		Jump   = { enabled = false, speed = 1.0 },
+		Wings  = { enabled = false, speed = 1.0 },
+		Halo   = { enabled = false, speed = 1.0 },
+		Hat    = { enabled = false, speed = 1.0 },
+		Trails = { enabled = false, speed = 1.0 },
+	},
+}
+
+local SPEED_PRESETS = {
+	{ label = "🐌 Slow",   value = 0.3 },
+	{ label = "🚶 Normal", value = 0.8 },
+	{ label = "🏃 Fast",   value = 2.0 },
+	{ label = "⚡ Ultra",  value = 5.0 },
+}
+
+local COLOR_TARGETS = { "Jump", "Wings", "Halo", "Hat", "Trails", "KillFX" }
+local currentColorTarget = "Wings"
+local fxState = { rainbowHue = 0 }
+local fxConnection = nil
+
+local effectsFolder
+local character, humanoid, torso, headPart
+local wingsFolder, haloFolder, hatFolder
+local wingParts, haloParts, hatParts = {}, {}, {}
+local jumpConnection, animConnection, characterConnection
+local animClock      = 0
+local flapAccum      = 0
+local flapReset      = false
+local lastJumpEffect = 0
+local rebuildPending = { Wings = false, Halo = false, Hat = false }
+
+local glowLight      = nil
+local auraFolder     = nil
+local auraParts      = {}
+local auraRingParts  = nil
+local auraConnection = nil
+local footprintTimer = 0
+local footprintConn  = nil
+local lastFootPos    = nil
+local idleSpinAngle  = 0
+local glowConn       = nil
+local petFolder      = nil
+local petOrb         = nil
+local petLight       = nil
+local petTrail       = nil
+local petConn        = nil
+local petCurrentPos  = nil
+
+local function ensureFolder()
+	if effectsFolder and effectsFolder.Parent then
+		return effectsFolder
+	end
+	effectsFolder = Instance.new("Folder")
+	effectsFolder.Name   = "CrystalHub_Effects"
+	effectsFolder.Parent = workspace
+	return effectsFolder
+end
+
+ensureFolder()
+
+local function newNeonPart(size, color, className)
+	local part = Instance.new(className or "Part")
+	part.Size       = size
+	part.Color      = color
+	part.Material   = Enum.Material.Neon
+	part.Anchored   = false
+	part.CanCollide = false
+	part.CanQuery   = false
+	part.CanTouch   = false
+	part.CastShadow = false
+	part.Massless   = true
+	part.Locked     = true
+	part.TopSurface    = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	return part
+end
+
+local function weldTo(basePart, part, c0)
+	local weld = Instance.new("Weld")
+	weld.Part0  = basePart
+	weld.Part1  = part
+	weld.C0     = c0
+	weld.Parent = part
+	return weld
+end
+
+local function lighten(color, amount)
+	return Color3.new(
+		math.min(color.R + amount, 1),
+		math.min(color.G + amount, 1),
+		math.min(color.B + amount, 1))
+end
+
+local function darken(color, amount)
+	return Color3.new(
+		math.max(color.R - amount, 0),
+		math.max(color.G - amount, 0),
+		math.max(color.B - amount, 0))
+end
+
+local function presetColorAt(presetColors, baseColor, ratio)
+	ratio = math.clamp(ratio, 0, 1)
+	if presetColors and #presetColors >= 2 then
+		local n = #presetColors
+		local pos = ratio * (n - 1)
+		local idx = math.floor(pos)
+		local frac = pos - idx
+		if idx >= n - 1 then
+			return presetColors[n]
+		end
+		return presetColors[idx + 1]:Lerp(presetColors[idx + 2], frac)
+	end
+	local light = lighten(baseColor, 0.4)
+	return baseColor:Lerp(light, ratio)
+end
+
+--======================================================================--
+--                      КРУГИ ПРЫЖКА                                    --
+--======================================================================--
+local function spawnFlash(position, diameter, color, duration)
+	local flash = Instance.new("Part")
+	flash.Shape        = Enum.PartType.Cylinder
+	flash.Size         = Vector3.new(0.08, diameter * 0.45, diameter * 0.45)
+	flash.CFrame       = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
+	flash.Anchored     = true
+	flash.CanCollide   = false
+	flash.CanQuery     = false
+	flash.CanTouch     = false
+	flash.CastShadow   = false
+	flash.Material     = Enum.Material.Neon
+	flash.Color        = lighten(color, 0.45)
+	flash.Transparency = 0.25
+	flash.Parent       = ensureFolder()
+	TweenService:Create(flash,
+		TweenInfo.new(duration * 0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		{ Size = Vector3.new(0.02, diameter * 1.5, diameter * 1.5), Transparency = 1 }
+	):Play()
+	Debris:AddItem(flash, duration + 0.1)
+end
+
+local function spawnDisc(position, diameter, thickness, color, duration, expand)
+	local disc = Instance.new("Part")
+	disc.Shape        = Enum.PartType.Cylinder
+	disc.Size         = Vector3.new(thickness, diameter, diameter)
+	disc.CFrame       = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
+	disc.Anchored     = true
+	disc.CanCollide   = false
+	disc.CanQuery     = false
+	disc.CanTouch     = false
+	disc.CastShadow   = false
+	disc.Material     = Enum.Material.Neon
+	disc.Color        = color
+	disc.Transparency = 0.15
+	disc.Parent       = ensureFolder()
+	TweenService:Create(disc,
+		TweenInfo.new(duration, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		{ Size = Vector3.new(thickness * 0.4, diameter * expand, diameter * expand), Transparency = 1 }
+	):Play()
+	Debris:AddItem(disc, duration + 0.15)
+end
+
+local function spawnArcRing(origin, opts)
+	local segments   = quantity(opts.Segments or 26, 8)
+	local sweep      = opts.Sweep     or (math.pi * 2)
+	local startAngle = opts.Start     or 0
+	local radius0    = opts.Radius0   or 1.2
+	local radius1    = opts.Radius1   or 8
+	local thickness  = opts.Thickness or 0.22
+	local duration   = opts.Duration  or 0.7
+	local spin       = opts.Spin      or 0
+	local tilt       = opts.Tilt      or 0
+	local fade       = opts.Fade      or 0
+	local rise       = opts.Rise      or 0
+	local color      = opts.Color     or Color3.fromRGB(255, 255, 255)
+	local tipColor   = lighten(color, 0.5)
+
+	local overlap = 1.08
+	local chord0  = (sweep * radius0 / segments) * overlap
+	local chord1  = (sweep * radius1 / segments) * overlap
+
+	local info   = TweenInfo.new(duration, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	local base   = CFrame.new(origin) * CFrame.Angles(tilt, 0, 0)
+	local folder = ensureFolder()
+
+	for index = 1, segments do
+		local ratio = (index - 1) / segments
+		local angle = startAngle + ratio * sweep
+		local piece = Instance.new("Part")
+		piece.Size         = Vector3.new(thickness, thickness, chord0)
+		piece.CFrame       = base * CFrame.Angles(0, angle, 0)
+			* CFrame.new(0, 0, -radius0) * CFrame.Angles(0, math.rad(90), 0)
+		piece.Anchored     = true
+		piece.CanCollide   = false
+		piece.CanQuery     = false
+		piece.CanTouch     = false
+		piece.CastShadow   = false
+		piece.Material     = Enum.Material.Neon
+		piece.Color        = color:Lerp(tipColor, ratio)
+		piece.Transparency = math.clamp(fade * ratio, 0, 0.9)
+		piece.Parent       = folder
+
+		TweenService:Create(piece, info, {
+			CFrame = base * CFrame.Angles(0, angle + spin, 0)
+				* CFrame.new(0, rise, -radius1) * CFrame.Angles(0, math.rad(90), 0),
+			Size         = Vector3.new(thickness * 0.32, thickness * 0.32, chord1),
+			Transparency = 1,
+		}):Play()
+		Debris:AddItem(piece, duration + 0.2)
+	end
+end
+
+Visuals.JumpStyles = {
+	"Swirl", "Ring", "Vortex", "Triple", "Nova",
+	"Ripple", "Comet", "Shockwave", "Petals",
+	"Bloom", "Spiral", "Galaxy", "Phoenix",
+	"Tsunami", "Kaleidoscope", "Black Hole",
+}
+
+local function playJumpEffect()
+	if not vis.Jump.Enabled or not torso then return end
+	local now = os.clock()
+	if now - lastJumpEffect < 0.15 then return end
+	lastJumpEffect = now
+
+	local folder = ensureFolder()
+	if #folder:GetChildren() > (IS_PHONE and 180 or 350) then return end
+
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local origin   = root.Position - Vector3.new(0, 2.55, 0)
+	local color    = vis.Jump.Color
+	local duration = vis.Jump.Duration
+	local size     = vis.Jump.Size
+	local style    = vis.Jump.Style
+
+	if vis.Jump.Flash then
+		spawnFlash(origin, size * 0.5, color, duration)
+	end
+
+	if style == "Ring" then
+		spawnArcRing(origin, {
+			Color = color, Duration = duration, Segments = 30,
+			Radius0 = size * 0.16, Radius1 = size, Thickness = size * 0.035,
+			Fade = 0.15, Rise = 0.25,
+		})
+	elseif style == "Ripple" then
+		for index = 1, 3 do
+			task.delay((index - 1) * 0.13, function()
+				spawnDisc(origin, size * (0.4 + index * 0.1), 0.14, color, duration, 2.1)
+			end)
+		end
+	elseif style == "Shockwave" then
+		spawnDisc(origin, size * 0.5, 0.18, color, duration, 2.6)
+		spawnArcRing(origin, {
+			Color = color, Duration = duration * 0.9, Segments = 34,
+			Radius0 = size * 0.3, Radius1 = size * 1.3, Thickness = size * 0.025, Fade = 0.05,
+		})
+	else
+		spawnArcRing(origin, {
+			Color     = color,
+			Duration  = duration,
+			Segments  = 28,
+			Sweep     = math.rad(310),
+			Start     = 0,
+			Radius0   = size * 0.15,
+			Radius1   = size,
+			Thickness = size * 0.045,
+			Spin      = 0.7,
+			Rise      = 0.4,
+			Fade      = 0.85,
+		})
+	end
+end
+
+--======================================================================--
+--                              КРЫЛЬЯ                                  --
+--======================================================================--
+local function clearWings()
+	if wingsFolder then wingsFolder:Destroy() end
+	wingsFolder = nil
+	wingParts   = {}
+	if torso then
+		for _, child in ipairs(torso:GetChildren()) do
+			if child.Name == "CrystalHub_WingGlow" then child:Destroy() end
+		end
+	end
+end
+
+local function addFeather(side, opts)
+	local feather = newNeonPart(Vector3.new(opts.Thickness, opts.Length, opts.Width), opts.Color)
+	feather.Transparency = opts.Transparency or 0.1
+	feather.Parent       = wingsFolder
+
+	local spread = opts.Spread + math.rad(vis.Wings.Droop or 0)
+	local origin = CFrame.new(side * opts.OriginX, opts.OriginY, opts.OriginZ)
+		* CFrame.Angles(opts.Pitch or 0, side * opts.Sweep, -side * spread)
+	local offset = CFrame.new(0, opts.Length * 0.5, 0)
+
+	table.insert(wingParts, {
+		Weld   = weldTo(torso, feather, origin * offset),
+		Origin = origin,
+		Offset = offset,
+		Phase  = opts.Phase or 0,
+		Amp    = opts.Amp or 0.12,
+	})
+	return feather
+end
+
+Visuals.WingStyles = { "Angel", "Demon", "Phantom", "Simple", "Crystal", "Butterfly", "Seraph", "Dragon", "Fairy", "Void" }
+
+local function buildWings()
+	clearWings()
+	if not vis.Wings.Enabled or not torso then return end
+
+	wingsFolder = Instance.new("Folder")
+	wingsFolder.Name   = "CrystalHub_Wings"
+	wingsFolder.Parent = character
+
+	local scale = vis.Wings.Scale
+	local base  = vis.Wings.Color
+	local style = vis.Wings.Style
+	local pc    = vis.Wings.PresetColors
+	local function colAt(ratio) return presetColorAt(pc, base, ratio) end
+
+	for _, side in ipairs({ -1, 1 }) do
+		local count = quantity(8, 4)
+		for index = 1, count do
+			local ratio = (index - 1) / (count - 1)
+			addFeather(side, {
+				Length = (4.0 - ratio * 1.5) * scale,
+				Width = 0.4 * scale, Thickness = 0.08 * scale,
+				Spread = math.rad(55 + ratio * 65), Sweep = math.rad(24), Pitch = math.rad(-12),
+				OriginX = 0.4 * scale, OriginY = 0.3 * scale, OriginZ = 0.65 * scale,
+				Color = colAt(ratio), Transparency = 0.1,
+				Phase = index * 0.3, Amp = 0.15
+			})
+		end
+	end
+
+	if vis.Wings.Glow then
+		local pointLight = Instance.new("PointLight")
+		pointLight.Color      = base
+		pointLight.Brightness = 2.4
+		pointLight.Range      = 14
+		pointLight.Shadows    = false
+		pointLight.Name       = "CrystalHub_WingGlow"
+		pointLight.Parent     = torso
+	end
+end
+
+--======================================================================--
+--                                НИМБ                                  --
+--======================================================================--
+local function clearHalo()
+	if haloFolder then haloFolder:Destroy() end
+	haloFolder = nil
+	haloParts  = {}
+	if headPart then
+		for _, child in ipairs(headPart:GetChildren()) do
+			if child.Name == "CrystalHub_HaloGlow" then child:Destroy() end
+		end
+	end
+end
+
+Visuals.HaloStyles = { "Ring", "Double", "Orbs", "Tilted", "Star", "Crown", "Lotus" }
+
+local function buildHalo()
+	clearHalo()
+	if not vis.Halo.Enabled or not headPart then return end
+
+	haloFolder = Instance.new("Folder")
+	haloFolder.Name   = "CrystalHub_Halo"
+	haloFolder.Parent = character
+
+	local color = vis.Halo.Color
+	local pc    = vis.Halo.PresetColors
+	local function colAt(ratio) return presetColorAt(pc, color, ratio) end
+
+	local segments = quantity(20, 12)
+	local radius = 0.9
+	local segmentLength = (2 * math.pi * radius / segments) * 1.12
+	for index = 1, segments do
+		local angle = (index / segments) * math.pi * 2
+		local t = (index - 1) / segments
+		local piece = newNeonPart(Vector3.new(0.07, 0.07, segmentLength), colAt(t))
+		piece.Parent = haloFolder
+		local weld = weldTo(headPart, piece, CFrame.new(0, 1.6, 0)
+			* CFrame.Angles(0, angle, 0)
+			* CFrame.new(0, 0, -radius)
+			* CFrame.Angles(0, math.rad(90), 0))
+		table.insert(haloParts, { Weld = weld, Angle = angle, Radius = radius, Height = 1.6, Tilt = 0, Direction = 1 })
+	end
+
+	if vis.Halo.Glow then
+		local pl = Instance.new("PointLight")
+		pl.Color = color
+		pl.Brightness = 1.6
+		pl.Range = 9
+		pl.Shadows = false
+		pl.Name = "CrystalHub_HaloGlow"
+		pl.Parent = headPart
+	end
+end
+
+--======================================================================--
+--                        CHINA HAT                                     --
+--======================================================================--
+local function clearChinaHat()
+	if hatFolder then hatFolder:Destroy() end
+	hatFolder = nil
+	hatParts  = {}
+	if headPart then
+		for _, child in ipairs(headPart:GetChildren()) do
+			if child.Name == "CrystalHub_HatGlow" then child:Destroy() end
+		end
+	end
+end
+
+Visuals.HatStyles = { "Layered", "Cone", "Rings", "Spikes", "Crown", "Diamond" }
+
+local function buildChinaHat()
+	clearChinaHat()
+	if not vis.ChinaHat.Enabled or not headPart then return end
+
+	hatFolder = Instance.new("Folder")
+	hatFolder.Name   = "CrystalHub_ChinaHat"
+	hatFolder.Parent = character
+
+	local color = vis.ChinaHat.Color
+	local size  = math.clamp(vis.ChinaHat.Size or 1, 0.4, 3)
+	local pc    = vis.ChinaHat.PresetColors
+	local function colAt(ratio) return presetColorAt(pc, color, ratio) end
+
+	local steps = quantity(5, 3)
+	for index = 1, steps do
+		local ratio  = (index - 1) / (steps - 1)
+		local radius = (2.8 - ratio * 2.3) * size
+		local height = (1.78 + ratio * 1.8) * size
+		local part = newNeonPart(Vector3.new(0.16 * size, radius * 2, radius * 2), colAt(ratio))
+		part.Shape = Enum.PartType.Cylinder
+		part.Transparency = 0.2
+		part.Parent = hatFolder
+		local weld = weldTo(headPart, part, CFrame.new(0, height, 0) * CFrame.Angles(0, 0, math.rad(90)))
+		table.insert(hatParts, { Weld = weld, Kind = "disc", Height = height })
+	end
+
+	if vis.ChinaHat.Glow then
+		local pointLight = Instance.new("PointLight")
+		pointLight.Color = color
+		pointLight.Brightness = 1.8
+		pointLight.Range = 11
+		pointLight.Shadows = false
+		pointLight.Name = "CrystalHub_HatGlow"
+		pointLight.Parent = headPart
+	end
+end
+
+--======================================================================--
+--                        ОБЩИЙ ЦИКЛ АНИМАЦИИ                           --
+--======================================================================--
+local function stopLoopIfIdle()
+	if #wingParts == 0 and #haloParts == 0 and #hatParts == 0 and animConnection then
+		animConnection:Disconnect()
+		animConnection = nil
+	end
+end
+
+local FLAP_STEP = 1 / 30
+
+local function ensureLoop()
+	if animConnection then return end
+	animConnection = RunService.Heartbeat:Connect(function(delta)
+		animClock = animClock + delta
+
+		if vis.Extra.IdleSpin.Enabled then
+			idleSpinAngle = idleSpinAngle + delta * vis.Extra.IdleSpin.Speed
+		end
+
+		local idleWobble = 0
+		if vis.Extra.IdleSpin.Enabled and vis.Extra.IdleSpin.Wobble then
+			idleWobble = math.sin(animClock * 1.8) * math.rad(12)
+		end
+
+		flapAccum = flapAccum + delta
+		if #wingParts > 0 and flapAccum >= FLAP_STEP then
+			flapAccum = 0
+			if vis.Wings.Flap then
+				flapReset = false
+				for _, item in ipairs(wingParts) do
+					if item.Weld and item.Weld.Parent then
+						local flap = math.sin(animClock * 2.6 + item.Phase) * (item.Amp or 0.13)
+						item.Weld.C0 = item.Origin * CFrame.Angles(0, 0, flap) * item.Offset
+					end
+				end
+			elseif not flapReset then
+				flapReset = true
+				for _, item in ipairs(wingParts) do
+					if item.Weld and item.Weld.Parent then
+						item.Weld.C0 = item.Origin * item.Offset
+					end
+				end
+			end
+		end
+
+		for _, item in ipairs(haloParts) do
+			if item.Weld and item.Weld.Parent then
+				local angle  = item.Angle + animClock * vis.Halo.Speed * item.Direction
+				if vis.Extra.IdleSpin.Enabled then angle = angle + idleSpinAngle end
+				item.Weld.C0 = CFrame.new(0, item.Height, 0)
+					* CFrame.Angles(idleWobble, angle, 0)
+					* CFrame.new(0, 0, -item.Radius)
+					* CFrame.Angles(0, math.rad(90), 0)
+			end
+		end
+
+		if #hatParts > 0 then
+			local spin = animClock * (vis.ChinaHat.Spin or 0)
+			if vis.Extra.IdleSpin.Enabled then spin = spin + idleSpinAngle end
+			for _, item in ipairs(hatParts) do
+				if item.Weld and item.Weld.Parent then
+					item.Weld.C0 = CFrame.new(0, item.Height, 0)
+						* CFrame.Angles(idleWobble, spin, 0)
+						* CFrame.Angles(0, 0, math.rad(90))
+				end
+			end
+		end
+	end)
+end
+
+--======================================================================--
+--                         EXTRA FEATURES                               --
+--======================================================================--
+local function buildGlow()
+	if not torso then return end
+	if glowLight then glowLight:Destroy() end
+	glowLight = Instance.new("PointLight")
+	glowLight.Name = "CrystalHub_AmbientGlow"
+	glowLight.Color = vis.Extra.Glow.Color
+	glowLight.Range = vis.Extra.Glow.Range
+	glowLight.Brightness = vis.Extra.Glow.Brightness
+	glowLight.Shadows = false
+	glowLight.Parent = torso
+end
+
+local function clearGlow()
+	if glowConn then glowConn:Disconnect() glowConn = nil end
+	if glowLight then glowLight:Destroy() glowLight = nil end
+end
+
+local function ensureGlowLoop()
+	if glowConn then return end
+	if not vis.Extra.Glow.Enabled then return end
+	local baseBright = vis.Extra.Glow.Brightness
+	local baseColor  = vis.Extra.Glow.Color
+	glowConn = RunService.Heartbeat:Connect(function()
+		if not vis.Extra.Glow.Enabled or not glowLight then return end
+		local t = os.clock()
+		if vis.Extra.Glow.Pulse then
+			local pulse = 0.7 + math.sin(t * 2.2) * 0.3
+			glowLight.Brightness = baseBright * pulse
+		end
+		if vis.Extra.Glow.ColorShift then
+			local h, s, v = Color3.toHSV(baseColor)
+			glowLight.Color = Color3.fromHSV((h + math.sin(t * 0.6) * 0.08) % 1, s, v)
+		end
+	end)
+end
+
+local function buildSoulPet()
+	if petFolder then petFolder:Destroy() end
+	petFolder = Instance.new("Folder")
+	petFolder.Name   = "CrystalHub_SoulPet"
+	petFolder.Parent = ensureFolder()
+	petCurrentPos = nil
+	if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart") or torso
+	if not root then return end
+	local cfg = vis.Extra.SoulPet
+
+	petOrb = newNeonPart(Vector3.new(cfg.Size, cfg.Size, cfg.Size), cfg.Color, "Part")
+	petOrb.Shape = Enum.PartType.Ball
+	petOrb.Anchored = true
+	petOrb.Parent = petFolder
+
+	petLight = Instance.new("PointLight")
+	petLight.Color = cfg.Color
+	petLight.Brightness = 3.5
+	petLight.Range = 12
+	petLight.Shadows = false
+	petLight.Parent = petOrb
+end
+
+local function clearSoulPet()
+	if petConn then petConn:Disconnect() petConn = nil end
+	if petFolder then petFolder:Destroy() petFolder = nil end
+	petOrb, petLight, petCurrentPos = nil, nil, nil
+end
+
+local function ensureSoulPetLoop()
+	if petConn then return end
+	if not vis.Extra.SoulPet.Enabled then return end
+	petConn = RunService.Heartbeat:Connect(function(dt)
+		if not vis.Extra.SoulPet.Enabled or not character or not petOrb then return end
+		local root = character:FindFirstChild("HumanoidRootPart") or torso
+		if not root then return end
+
+		local cfg = vis.Extra.SoulPet
+		local t = os.clock()
+		local angle = t * cfg.Speed
+		local targetPos = root.Position + Vector3.new(
+			math.cos(angle) * cfg.Distance,
+			cfg.Height + math.sin(t * 1.8) * 0.7,
+			math.sin(angle) * cfg.Distance
+		)
+
+		if not petCurrentPos then
+			petCurrentPos = targetPos
+		else
+			petCurrentPos = petCurrentPos:Lerp(targetPos, math.clamp(dt * 8, 0, 1))
+		end
+
+		petOrb.CFrame = CFrame.new(petCurrentPos)
+	end)
+end
+
+local function findTorso(char, human)
+	local rig = human and human.RigType
+	if rig == Enum.HumanoidRigType.R6 then
+		return char:FindFirstChild("Torso") or char:WaitForChild("Torso", 3)
+	end
+	return char:FindFirstChild("UpperTorso") or char:WaitForChild("UpperTorso", 3)
+end
+
+local function bindCharacter(char)
+	character = char
+	humanoid  = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 10)
+	torso     = findTorso(char, humanoid) or char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 3)
+	headPart  = char:FindFirstChild("Head") or char:WaitForChild("Head", 3) or torso
+
+	wingParts, haloParts, hatParts = {}, {}, {}
+
+	if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
+	if humanoid then
+		jumpConnection = humanoid.Jumping:Connect(function(active)
+			if active then playJumpEffect() end
+		end)
+	end
+
+	if vis.Wings.Enabled then buildWings() end
+	if vis.Halo.Enabled then buildHalo() end
+	if vis.ChinaHat.Enabled then buildChinaHat() end
+	if #wingParts > 0 or #haloParts > 0 or #hatParts > 0 then ensureLoop() end
+
+	if vis.Extra.Glow.Enabled then buildGlow() ensureGlowLoop() end
+	if vis.Extra.SoulPet.Enabled then buildSoulPet() ensureSoulPetLoop() end
+end
+
+if LocalPlayer.Character then task.spawn(bindCharacter, LocalPlayer.Character) end
+characterConnection = LocalPlayer.CharacterAdded:Connect(function(char)
+	task.wait(0.3)
+	bindCharacter(char)
+end)
+
+--======================================================================--
+--                         СИСТЕМА GUI (STANDALONE)                     --
+--======================================================================--
+local function getGuiParent()
+	local ok, res = pcall(function() return gethui() end)
+	if ok and res then return res end
+	ok, res = pcall(function() return CoreGui end)
+	if ok and res then return res end
+	return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local existing = getGuiParent():FindFirstChild("CrystalHub_Visuals_UI")
+if existing then existing:Destroy() end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CrystalHub_Visuals_UI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = getGuiParent()
+
+-- Всплывающие уведомления (Toasts)
+local NotifyContainer = Instance.new("Frame")
+NotifyContainer.Size = UDim2.new(0, 240, 1, -20)
+NotifyContainer.Position = UDim2.new(1, -250, 0, 10)
+NotifyContainer.BackgroundTransparency = 1
+NotifyContainer.Parent = ScreenGui
+
+local function notify(text, duration)
+	duration = duration or 2
+	local card = Instance.new("Frame")
+	card.Size = UDim2.new(1, 0, 0, 36)
+	card.BackgroundColor3 = Color3.fromRGB(20, 22, 34)
+	card.BorderSizePixel = 0
+	card.Parent = NotifyContainer
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(120, 100, 255)
+	stroke.Thickness = 1
+	stroke.Parent = card
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = card
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -10, 1, 0)
+	lbl.Position = UDim2.new(0, 10, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamMedium
+	lbl.Text = tostring(text)
+	lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+	lbl.TextSize = 13
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = card
+
+	Debris:AddItem(card, duration + 0.3)
+	TweenService:Create(card, TweenInfo.new(0.3), { BackgroundTransparency = 0 }):Play()
+end
+
+-- Плавающая кнопка переключения меню
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 46, 0, 46)
+ToggleBtn.Position = UDim2.new(0, 15, 0.5, -23)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 42)
+ToggleBtn.Text = "🔮"
+ToggleBtn.TextSize = 22
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Parent = ScreenGui
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(1, 0)
+btnCorner.Parent = ToggleBtn
+
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(140, 100, 255)
+btnStroke.Thickness = 1.5
+btnStroke.Parent = ToggleBtn
+
+-- Главное окно
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, IS_PHONE and 420 or 520, 0, IS_PHONE and 300 or 360)
+MainFrame.Position = UDim2.new(0.5, -((IS_PHONE and 420 or 520)/2), 0.5, -((IS_PHONE and 300 or 360)/2))
+MainFrame.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = MainFrame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(80, 70, 140)
+mainStroke.Thickness = 1.2
+mainStroke.Parent = MainFrame
+
+-- Заголовок
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 38)
+TitleBar.BackgroundColor3 = Color3.fromRGB(22, 24, 38)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Size = UDim2.new(1, -50, 1, 0)
+titleLbl.Position = UDim2.new(0, 14, 0, 0)
+titleLbl.BackgroundTransparency = 1
+titleLbl.Font = Enum.Font.GothamBold
+titleLbl.Text = "✨ Crystal Hub — Visuals (Standalone)"
+titleLbl.TextColor3 = Color3.fromRGB(230, 230, 255)
+titleLbl.TextSize = 14
+titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+titleLbl.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -34, 0, 3)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+	MainFrame.Visible = false
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+	MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Вкладки (Sidebar)
+local TabBar = Instance.new("ScrollingFrame")
+TabBar.Size = UDim2.new(0, 120, 1, -38)
+TabBar.Position = UDim2.new(0, 0, 0, 38)
+TabBar.BackgroundColor3 = Color3.fromRGB(18, 20, 32)
+TabBar.BorderSizePixel = 0
+TabBar.ScrollBarThickness = 2
+TabBar.Parent = MainFrame
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.Padding = UDim.new(0, 4)
+tabLayout.Parent = TabBar
+
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -120, 1, -38)
+ContentArea.Position = UDim2.new(0, 120, 0, 38)
+ContentArea.BackgroundTransparency = 1
+ContentArea.Parent = MainFrame
+
+local tabs = {}
+local currentTab = nil
+
+local function createTab(name, icon)
+	local page = Instance.new("ScrollingFrame")
+	page.Size = UDim2.new(1, -10, 1, -10)
+	page.Position = UDim2.new(0, 5, 0, 5)
+	page.BackgroundTransparency = 1
+	page.ScrollBarThickness = 3
+	page.Visible = false
+	page.Parent = ContentArea
+
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 6)
+	list.Parent = page
+
+	local tabBtn = Instance.new("TextButton")
+	tabBtn.Size = UDim2.new(1, -8, 0, 30)
+	tabBtn.BackgroundColor3 = Color3.fromRGB(26, 28, 44)
+	tabBtn.Text = (icon or "") .. " " .. name
+	tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
+	tabBtn.Font = Enum.Font.GothamMedium
+	tabBtn.TextSize = 12
+	tabBtn.Parent = TabBar
+
+	local tCorner = Instance.new("UICorner")
+	tCorner.CornerRadius = UDim.new(0, 6)
+	tCorner.Parent = tabBtn
+
+	tabBtn.MouseButton1Click:Connect(function()
+		for _, t in pairs(tabs) do
+			t.Page.Visible = false
+			t.Btn.BackgroundColor3 = Color3.fromRGB(26, 28, 44)
+			t.Btn.TextColor3 = Color3.fromRGB(180, 180, 210)
+		end
+		page.Visible = true
+		tabBtn.BackgroundColor3 = Color3.fromRGB(90, 70, 180)
+		tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	end)
+
+	local tabObj = { Page = page, Btn = tabBtn }
+	table.insert(tabs, tabObj)
+	if #tabs == 1 then
+		page.Visible = true
+		tabBtn.BackgroundColor3 = Color3.fromRGB(90, 70, 180)
+		tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	end
+	return page
+end
+
+-- Элементы управления для вкладок
+local function addToggle(page, labelText, default, callback)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -10, 0, 32)
+	row.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
+	row.Parent = page
+
+	local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = row
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -50, 1, 0)
+	lbl.Position = UDim2.new(0, 8, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.Gotham
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
+	lbl.TextSize = 12
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local tBtn = Instance.new("TextButton")
+	tBtn.Size = UDim2.new(0, 36, 0, 20)
+	tBtn.Position = UDim2.new(1, -42, 0.5, -10)
+	tBtn.BackgroundColor3 = default and Color3.fromRGB(80, 200, 100) or Color3.fromRGB(60, 60, 80)
+	tBtn.Text = ""
+	tBtn.Parent = row
+
+	local bCorner = Instance.new("UICorner") bCorner.CornerRadius = UDim.new(1, 0) bCorner.Parent = tBtn
+
+	local state = default
+	tBtn.MouseButton1Click:Connect(function()
+		state = not state
+		tBtn.BackgroundColor3 = state and Color3.fromRGB(80, 200, 100) or Color3.fromRGB(60, 60, 80)
+		callback(state)
+	end)
+end
+
+local function addDropdown(page, labelText, options, callback)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -10, 0, 34)
+	row.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
+	row.Parent = page
+
+	local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = row
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.4, 0, 1, 0)
+	lbl.Position = UDim2.new(0, 8, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.Gotham
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
+	lbl.TextSize = 12
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local nextBtn = Instance.new("TextButton")
+	nextBtn.Size = UDim2.new(0.55, -8, 0, 24)
+	nextBtn.Position = UDim2.new(0.45, 0, 0.5, -12)
+	nextBtn.BackgroundColor3 = Color3.fromRGB(36, 38, 56)
+	nextBtn.Font = Enum.Font.GothamMedium
+	nextBtn.Text = tostring(options[1] or "Select")
+	nextBtn.TextColor3 = Color3.fromRGB(240, 240, 255)
+	nextBtn.TextSize = 11
+	nextBtn.Parent = row
+
+	local nCorner = Instance.new("UICorner") nCorner.CornerRadius = UDim.new(0, 4) nCorner.Parent = nextBtn
+
+	local idx = 1
+	nextBtn.MouseButton1Click:Connect(function()
+		idx = (idx % #options) + 1
+		local sel = options[idx]
+		nextBtn.Text = tostring(sel)
+		callback(sel)
+		notify(labelText .. ": " .. tostring(sel), 1.5)
+	end)
+end
+
+local function addSlider(page, labelText, minVal, maxVal, defaultVal, callback)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -10, 0, 40)
+	row.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
+	row.Parent = page
+
+	local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = row
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.6, 0, 0, 18)
+	lbl.Position = UDim2.new(0, 8, 0, 2)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.Gotham
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
+	lbl.TextSize = 11
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local valLbl = Instance.new("TextLabel")
+	valLbl.Size = UDim2.new(0.3, 0, 0, 18)
+	valLbl.Position = UDim2.new(0.7, -8, 0, 2)
+	valLbl.BackgroundTransparency = 1
+	valLbl.Font = Enum.Font.GothamBold
+	valLbl.Text = tostring(defaultVal)
+	valLbl.TextColor3 = Color3.fromRGB(160, 140, 255)
+	valLbl.TextSize = 11
+	valLbl.TextXAlignment = Enum.TextXAlignment.Right
+	valLbl.Parent = row
+
+	local track = Instance.new("TextButton")
+	track.Size = UDim2.new(1, -16, 0, 8)
+	track.Position = UDim2.new(0, 8, 0, 24)
+	track.BackgroundColor3 = Color3.fromRGB(40, 42, 60)
+	track.Text = ""
+	track.Parent = row
+
+	local fill = Instance.new("Frame")
+	local pct = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
+	fill.Size = UDim2.new(pct, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(120, 90, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+
+	local function update(input)
+		local x = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		fill.Size = UDim2.new(x, 0, 1, 0)
+		local val = math.floor(minVal + (maxVal - minVal) * x + 0.5)
+		valLbl.Text = tostring(val)
+		callback(val)
+	end
+
+	local dragging = false
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			update(input)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			update(input)
+		end
+	end)
+end
+
+-- Создаем страницы и элементы
+local pageJump = createTab("Jump", "🦘")
+addToggle(pageJump, "Enable Jump Effect", vis.Jump.Enabled, function(v) vis.Jump.Enabled = v end)
+addDropdown(pageJump, "Style", Visuals.JumpStyles, function(v) vis.Jump.Style = v end)
+addSlider(pageJump, "Size", 3, 20, vis.Jump.Size, function(v) vis.Jump.Size = v end)
+addSlider(pageJump, "Duration x10", 3, 20, 7, function(v) vis.Jump.Duration = v / 10 end)
+
+local pageWings = createTab("Wings", "🪽")
+addToggle(pageWings, "Enable Wings", vis.Wings.Enabled, function(v)
+	vis.Wings.Enabled = v
+	if v then buildWings() ensureLoop() else clearWings() stopLoopIfIdle() end
+end)
+addDropdown(pageWings, "Style", Visuals.WingStyles, function(v)
+	vis.Wings.Style = v
+	if vis.Wings.Enabled then buildWings() end
+end)
+addSlider(pageWings, "Size x10", 5, 20, 10, function(v)
+	vis.Wings.Scale = v / 10
+	if vis.Wings.Enabled then buildWings() end
+end)
+
+local pageHalo = createTab("Halo", "✨")
+addToggle(pageHalo, "Enable Halo", vis.Halo.Enabled, function(v)
+	vis.Halo.Enabled = v
+	if v then buildHalo() ensureLoop() else clearHalo() stopLoopIfIdle() end
+end)
+addDropdown(pageHalo, "Style", Visuals.HaloStyles, function(v)
+	vis.Halo.Style = v
+	if vis.Halo.Enabled then buildHalo() end
+end)
+
+local pageHat = createTab("Hat", "👒")
+addToggle(pageHat, "Enable China Hat", vis.ChinaHat.Enabled, function(v)
+	vis.ChinaHat.Enabled = v
+	if v then buildChinaHat() ensureLoop() else clearChinaHat() stopLoopIfIdle() end
+end)
+addDropdown(pageHat, "Style", Visuals.HatStyles, function(v)
+	vis.ChinaHat.Style = v
+	if vis.ChinaHat.Enabled then buildChinaHat() end
+end)
+
+local pageExtra = createTab("Extra", "🌟")
+addToggle(pageExtra, "Ambient Glow", vis.Extra.Glow.Enabled, function(v)
+	vis.
