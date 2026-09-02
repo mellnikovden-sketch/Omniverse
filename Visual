@@ -2639,22 +2639,17 @@ local function ensureAuraLoop()
                         local ringR = cfg.Radius * 1.4 * pulse
                         local ringY = base.Y - 2.8
                         for _, rp in ipairs(auraRingParts) do
-                                if not rp.part or rp.part.Parent == nil then
-                                        goto skipRing
+                                if rp.part and rp.part.Parent ~= nil then
+                                        local a = rp.angle + t * 0.5
+                                        local pos = base + Vector3.new(math.cos(a) * ringR, ringY, math.sin(a) * ringR)
+                                        rp.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, a + math.rad(90), 0)
+                                        rp.part.Transparency = 0.15 + math.sin(t * 3 + rp.angle * 3) * 0.1
                                 end
-                                local a = rp.angle + t * 0.5
-                                local pos = base + Vector3.new(math.cos(a) * ringR, ringY, math.sin(a) * ringR)
-                                rp.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, a + math.rad(90), 0)
-                                rp.part.Transparency = 0.15 + math.sin(t * 3 + rp.angle * 3) * 0.1
-                                ::skipRing::
                         end
                 end
                 -- анимация частиц
                 for _, item in ipairs(auraParts) do
-                        if not item.part or item.part.Parent == nil then
-                                -- частица уже удалена (респавн / clearAura) — пропускаем
-                                goto skipItem
-                        end
+                        if item.part and item.part.Parent ~= nil then
                         if item.layer == 3 then
                                 -- Rising spark: поднимается снизу вверх и исчезает
                                 local cycle = (t * item.riseSpeed + item.riseOffset) % 4
@@ -2701,7 +2696,7 @@ local function ensureAuraLoop()
                                         item.part.Size = Vector3.new(item.sizeVar, item.sizeVar, item.sizeVar) * pulse
                                 end
                         end
-                        ::skipItem::
+                        end
                 end
         end)
 end
@@ -3422,44 +3417,44 @@ local function ensureSoulPetLoop()
                         -- мерцающие искры
                         if petExtra.sparks then
                                 for k, sp in ipairs(petExtra.sparks) do
-                                        if not sp or sp.Parent == nil then goto skipSpark end
-                                        local a = t * 2 + (k / #petExtra.sparks) * math.pi * 2
-                                        local r = cfg.Size * 1.3
-                                        local sp2 = pos + Vector3.new(math.cos(a) * r, math.sin(t * 3 + k) * 0.6, math.sin(a) * r)
-                                        sp.CFrame = CFrame.new(sp2)
-                                        sp.Transparency = 0.2 + math.sin(t * 6 + k) * 0.25
-                                        ::skipSpark::
+                                        if sp and sp.Parent ~= nil then
+                                                local a = t * 2 + (k / #petExtra.sparks) * math.pi * 2
+                                                local r = cfg.Size * 1.3
+                                                local sp2 = pos + Vector3.new(math.cos(a) * r, math.sin(t * 3 + k) * 0.6, math.sin(a) * r)
+                                                sp.CFrame = CFrame.new(sp2)
+                                                sp.Transparency = 0.2 + math.sin(t * 6 + k) * 0.25
+                                        end
                                 end
                         end
 
                 elseif style == "Dragonling" and petExtra.tail then
                         -- Dragonling: tail segments trail behind the orb
                         for i, tp in ipairs(petExtra.tail) do
-                                if not tp or tp.Parent == nil then goto skipTail end
-                                local lag = i * 0.08
-                                local a = angle - lag
-                                local tpos = pos + Vector3.new(
-                                        -math.cos(angle) * i * 0.2,
-                                        -i * 0.05 + math.sin(t * 3 + i) * 0.1,
-                                        -math.sin(angle) * i * 0.2
-                                )
-                                tp.CFrame = CFrame.new(tpos)
-                                ::skipTail::
+                                if tp and tp.Parent ~= nil then
+                                        local lag = i * 0.08
+                                        local a = angle - lag
+                                        local tpos = pos + Vector3.new(
+                                                -math.cos(angle) * i * 0.2,
+                                                -i * 0.05 + math.sin(t * 3 + i) * 0.1,
+                                                -math.sin(angle) * i * 0.2
+                                        )
+                                        tp.CFrame = CFrame.new(tpos)
+                                end
                         end
 
                 elseif style == "Eye of God" and petExtra.rings then
                         -- Eye of God: rotating halo rings around the orb on different axes
                         for _, ringData in ipairs(petExtra.rings) do
-                                if not ringData.part or ringData.part.Parent == nil then goto skipRing end
-                                local rot = t * ringData.speed
-                                if ringData.axis == 1 then
-                                        ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(rot, 0, 0)
-                                elseif ringData.axis == 2 then
-                                        ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, rot, 0)
-                                else
-                                        ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, rot)
+                                if ringData.part and ringData.part.Parent ~= nil then
+                                        local rot = t * ringData.speed
+                                        if ringData.axis == 1 then
+                                                ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(rot, 0, 0)
+                                        elseif ringData.axis == 2 then
+                                                ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, rot, 0)
+                                        else
+                                                ringData.part.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, rot)
+                                        end
                                 end
-                                ::skipRing::
                         end
 
                 elseif style == "Companion Cube" and petExtra.core and petExtra.core.Parent then
