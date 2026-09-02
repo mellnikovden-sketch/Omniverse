@@ -4872,6 +4872,7 @@ local function setRainbow(target, enabled)
 end
 
 
+
 --======================================================================--
 --         CRYSTAL HUB — MODERN UI LIBRARY v2 (Fluent-inspired)          --
 --======================================================================--
@@ -5651,12 +5652,18 @@ local function createSection(name, icon)
 
         local dropdownOpen = false
         local dropdownFrame
+        local backdrop
 
         local function closeDropdown()
             if dropdownFrame then
-                tween(dropdownFrame, { Size = UDim2.new(0, row.AbsoluteSize.X, 0, 0) }, 0.12, Enum.EasingStyle.Exponential)
-                task.delay(0.15, function()
-                    if dropdownFrame then dropdownFrame:Destroy() dropdownFrame = nil end
+                local t = tween(dropdownFrame, { Size = UDim2.new(0, dropdownFrame.AbsoluteSize.X, 0, 0), Position = UDim2.new(0, dropdownFrame.AbsolutePosition.X, 0, dropdownFrame.AbsolutePosition.Y + dropdownFrame.AbsoluteSize.Y * 0.3) }, 0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
+                t.Completed:Wait()
+                if dropdownFrame then dropdownFrame:Destroy() dropdownFrame = nil end
+            end
+            if backdrop then
+                tween(backdrop, { BackgroundTransparency = 1 }, 0.15)
+                task.delay(0.16, function()
+                    if backdrop then backdrop:Destroy() backdrop = nil end
                 end)
             end
             dropdownOpen = false
@@ -5668,33 +5675,92 @@ local function createSection(name, icon)
             dropdownOpen = true
             tween(arrow, { TextColor3 = THEME.AccentLight, Rotation = 180 }, 0.15)
 
+            local g = getGui()
+            local rowPos = row.AbsolutePosition
+            local rowSize = row.AbsoluteSize
+            local vp = workspace.CurrentCamera.ViewportSize
+
+            -- ── Backdrop (dim everything behind popup) ──
+            backdrop = Instance.new("TextButton")
+            backdrop.Size = UDim2.new(1, 0, 1, 0)
+            backdrop.Position = UDim2.new(0, 0, 0, 0)
+            backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            backdrop.BackgroundTransparency = 1
+            backdrop.BorderSizePixel = 0
+            backdrop.Text = ""
+            backdrop.AutoButtonColor = false
+            backdrop.ZIndex = 600
+            backdrop.Parent = g
+            tween(backdrop, { BackgroundTransparency = 0.4 }, 0.15)
+            backdrop.Activated:Connect(function()
+                closeDropdown()
+            end)
+
+            -- ── Popup window (separate, on ScreenGui, above everything) ──
+            local popupWidth = math.max(rowSize.X, 180)
+            local popupHeight = math.min(#options * 28 + 8, 220)
+
+            -- Calculate position: below the row, but flip above if near bottom
+            local popX = rowPos.X
+            local popY = rowPos.Y + rowSize.Y + 4
+            if popY + popupHeight > vp.Y - 10 then
+                popY = rowPos.Y - popupHeight - 4
+            end
+            -- Clamp horizontally
+            if popX + popupWidth > vp.X - 10 then
+                popX = vp.X - popupWidth - 10
+            end
+            if popX < 10 then popX = 10 end
+
             dropdownFrame = Instance.new("Frame")
-            dropdownFrame.Size = UDim2.new(0, row.AbsoluteSize.X, 0, 0)
-            dropdownFrame.Position = UDim2.new(0, 0, 1, 4)
+            dropdownFrame.Name = "DropdownPopup"
+            dropdownFrame.Size = UDim2.new(0, popupWidth, 0, 0)
+            dropdownFrame.Position = UDim2.new(0, popX, 0, popY + 10)  -- start slightly below for animation
             dropdownFrame.BackgroundColor3 = THEME.DropdownBg
             dropdownFrame.BorderSizePixel = 0
-            dropdownFrame.ZIndex = 200
-            dropdownFrame.Parent = row
+            dropdownFrame.ZIndex = 650
+            dropdownFrame.ClipsDescendants = true
+            dropdownFrame.Parent = g
             corner(dropdownFrame, THEME.CornerSm)
-            stroke(dropdownFrame, THEME.Border, 1, 0.4)
+            stroke(dropdownFrame, THEME.BorderLight, 1.5, 0.15)
+
+            -- Shadow effect
+            local shadow = Instance.new("UIStroke")
+            shadow.Color = Color3.fromRGB(0, 0, 0)
+            shadow.Thickness = 3
+            shadow.Transparency = 0.7
+            shadow.Parent = dropdownFrame
+
+            local scrollFrame = Instance.new("ScrollingFrame")
+            scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+            scrollFrame.BackgroundTransparency = 1
+            scrollFrame.ScrollBarThickness = 3
+            scrollFrame.ScrollBarImageColor3 = THEME.Border
+            scrollFrame.ScrollBarImageTransparency = 0.4
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+            scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+            scrollFrame.ZIndex = 651
+            scrollFrame.Parent = dropdownFrame
 
             local listLayout = Instance.new("UIListLayout")
-            listLayout.Padding = UDim.new(0, 1)
+            listLayout.Padding = UDim.new(0, 2)
             listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            listLayout.Parent = dropdownFrame
+            listLayout.Parent = scrollFrame
 
-            local maxHeight = 0
+            padding(scrollFrame, 4, 4, 4, 4)
+
             for _, option in ipairs(options) do
                 local item = Instance.new("TextButton")
                 item.Size = UDim2.new(1, 0, 0, 26)
                 item.BackgroundColor3 = (option == currentValue) and THEME.ElementHover or THEME.DropdownBg
                 item.Text = ""
                 item.AutoButtonColor = false
-                item.ZIndex = 201
-                item.Parent = dropdownFrame
+                item.ZIndex = 652
+                item.Parent = scrollFrame
+                corner(item, THEME.CornerSm)
 
                 local itemLbl = Instance.new("TextLabel")
-                itemLbl.Size = UDim2.new(1, -16, 1, 0)
+                itemLbl.Size = UDim2.new(1, -20, 1, 0)
                 itemLbl.Position = UDim2.new(0, 10, 0, 0)
                 itemLbl.BackgroundTransparency = 1
                 itemLbl.Font = Enum.Font.GothamMedium
@@ -5702,8 +5768,22 @@ local function createSection(name, icon)
                 itemLbl.TextSize = IS_PHONE and 11 or 12
                 itemLbl.TextColor3 = (option == currentValue) and THEME.AccentLight or THEME.Text
                 itemLbl.TextXAlignment = Enum.TextXAlignment.Left
-                itemLbl.ZIndex = 202
+                itemLbl.ZIndex = 653
                 itemLbl.Parent = item
+
+                -- Check mark for selected
+                if option == currentValue then
+                    local check = Instance.new("TextLabel")
+                    check.Size = UDim2.new(0, 16, 1, 0)
+                    check.Position = UDim2.new(1, -20, 0, 0)
+                    check.BackgroundTransparency = 1
+                    check.Font = Enum.Font.GothamBold
+                    check.Text = "✓"
+                    check.TextSize = 12
+                    check.TextColor3 = THEME.AccentLight
+                    check.ZIndex = 653
+                    check.Parent = item
+                end
 
                 item.MouseEnter:Connect(function()
                     tween(item, { BackgroundColor3 = THEME.ElementHover }, 0.1)
@@ -5718,29 +5798,10 @@ local function createSection(name, icon)
                     if callback then task.spawn(function() callback(option) end) end
                     closeDropdown()
                 end)
-                maxHeight = maxHeight + 27
             end
 
-            tween(dropdownFrame, { Size = UDim2.new(0, row.AbsoluteSize.X, 0, math.min(maxHeight, 200)) }, 0.15, Enum.EasingStyle.Exponential)
-        end)
-
-        -- Close on outside click
-        UserInputService.InputBegan:Connect(function(input, gpe)
-            if dropdownOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-                task.wait(0.02)
-                if dropdownFrame then
-                    local mp = UserInputService:GetMouseLocation()
-                    local dp = dropdownFrame.AbsolutePosition
-                    local ds = dropdownFrame.AbsoluteSize
-                    local rp = row.AbsolutePosition
-                    local rs = row.AbsoluteSize
-                    local inDropdown = mp.X >= dp.X and mp.X <= dp.X + ds.X and mp.Y >= dp.Y and mp.Y <= dp.Y + ds.Y
-                    local inRow = mp.X >= rp.X and mp.X <= rp.X + rs.X and mp.Y >= rp.Y and mp.Y <= rp.Y + rs.Y
-                    if not inDropdown and not inRow then
-                        closeDropdown()
-                    end
-                end
-            end
+            -- Animate popup open
+            tween(dropdownFrame, { Size = UDim2.new(0, popupWidth, 0, popupHeight), Position = UDim2.new(0, popX, 0, popY) }, 0.18, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
         end)
 
         local ddObj = {}
@@ -5793,21 +5854,66 @@ local function createSection(name, icon)
         local currentColor = defaultColor or Color3.fromRGB(255, 255, 255)
         local pickerFrame
 
+        local pickerFrame
+        local pickerBackdrop
+
+        local function closePicker()
+            if pickerBackdrop then
+                tween(pickerBackdrop, { BackgroundTransparency = 1 }, 0.15)
+                task.delay(0.16, function()
+                    if pickerBackdrop then pickerBackdrop:Destroy() pickerBackdrop = nil end
+                end)
+            end
+            if pickerFrame then
+                local t = tween(pickerFrame, { Size = UDim2.new(0, 220, 0, 0), Position = UDim2.new(0.5, -110, 0.5, 0) }, 0.18, Enum.EasingStyle.Exponential, Enum.EasingDirection.In)
+                t.Completed:Wait()
+                if pickerFrame then pickerFrame:Destroy() pickerFrame = nil end
+            end
+        end
+
         row.Activated:Connect(function()
             if pickerFrame then
-                pickerFrame:Destroy() pickerFrame = nil
+                closePicker()
                 return
             end
 
+            local g = getGui()
+
+            -- ── Backdrop dim ──
+            pickerBackdrop = Instance.new("TextButton")
+            pickerBackdrop.Size = UDim2.new(1, 0, 1, 0)
+            pickerBackdrop.Position = UDim2.new(0, 0, 0, 0)
+            pickerBackdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            pickerBackdrop.BackgroundTransparency = 1
+            pickerBackdrop.BorderSizePixel = 0
+            pickerBackdrop.Text = ""
+            pickerBackdrop.AutoButtonColor = false
+            pickerBackdrop.ZIndex = 600
+            pickerBackdrop.Parent = g
+            tween(pickerBackdrop, { BackgroundTransparency = 0.4 }, 0.15)
+            pickerBackdrop.Activated:Connect(function()
+                closePicker()
+            end)
+
             pickerFrame = Instance.new("Frame")
-            pickerFrame.Size = UDim2.new(0, 220, 0, 180)
-            pickerFrame.Position = UDim2.new(0.5, -110, 0.5, -90)
+            pickerFrame.Size = UDim2.new(0, 220, 0, 0)
+            pickerFrame.Position = UDim2.new(0.5, -110, 0.5, 0)
             pickerFrame.BackgroundColor3 = THEME.Background
             pickerFrame.BorderSizePixel = 0
-            pickerFrame.ZIndex = 500
-            pickerFrame.Parent = getGui()
+            pickerFrame.ZIndex = 650
+            pickerFrame.Parent = g
             corner(pickerFrame, THEME.Corner)
-            stroke(pickerFrame, THEME.Border, 1.5, 0.2)
+            stroke(pickerFrame, THEME.BorderLight, 1.5, 0.15)
+
+            -- Shadow
+            local pickerShadow = Instance.new("UIStroke")
+            pickerShadow.Color = Color3.fromRGB(0, 0, 0)
+            pickerShadow.Thickness = 3
+            pickerShadow.Transparency = 0.7
+            pickerShadow.Parent = pickerFrame
+
+            -- Animate in
+            tween(pickerFrame, { Size = UDim2.new(0, 220, 0, 195), Position = UDim2.new(0.5, -110, 0.5, -97) }, 0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
             -- SV picker area
             local svArea = Instance.new("TextButton")
@@ -5817,7 +5923,7 @@ local function createSection(name, icon)
             svArea.BorderSizePixel = 0
             svArea.Text = ""
             svArea.AutoButtonColor = false
-            svArea.ZIndex = 501
+            svArea.ZIndex = 651
             svArea.Parent = pickerFrame
             corner(svArea, UDim.new(0, 4))
 
@@ -5830,7 +5936,7 @@ local function createSection(name, icon)
             local valOverlay = Instance.new("Frame")
             valOverlay.Size = UDim2.new(1, 0, 1, 0)
             valOverlay.BackgroundTransparency = 1
-            valOverlay.ZIndex = 502
+            valOverlay.ZIndex = 652
             valOverlay.Parent = svArea
 
             local valGrad = Instance.new("UIGradient")
@@ -5846,7 +5952,7 @@ local function createSection(name, icon)
             hueBar.BorderSizePixel = 0
             hueBar.Text = ""
             hueBar.AutoButtonColor = false
-            hueBar.ZIndex = 501
+            hueBar.ZIndex = 651
             hueBar.Parent = pickerFrame
             corner(hueBar, UDim.new(0, 7))
 
@@ -5933,24 +6039,11 @@ local function createSection(name, icon)
             closeBtn.TextSize = 12
             closeBtn.TextColor3 = THEME.TextDim
             closeBtn.AutoButtonColor = false
-            closeBtn.ZIndex = 501
+            closeBtn.ZIndex = 651
             closeBtn.Parent = pickerFrame
             corner(closeBtn, THEME.CornerSm)
             closeBtn.Activated:Connect(function()
-                pickerFrame:Destroy() pickerFrame = nil
-            end)
-
-            -- Outside click close
-            UserInputService.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 and pickerFrame then
-                    task.wait(0.02)
-                    local mp = UserInputService:GetMouseLocation()
-                    local dp = pickerFrame.AbsolutePosition
-                    local ds = pickerFrame.AbsoluteSize
-                    if mp.X < dp.X or mp.X > dp.X + ds.X or mp.Y < dp.Y or mp.Y > dp.Y + ds.Y then
-                        pickerFrame:Destroy() pickerFrame = nil
-                    end
-                end
+                closePicker()
             end)
         end)
 
