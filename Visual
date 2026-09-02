@@ -1,3 +1,8 @@
+-- ====================================================================== --
+--            CRYSTAL HUB VISUALS — FULL STANDALONE (PRO UI)              --
+--        Полный набор функций, выпадающие таблицы и мгновенный Rebuild   --
+-- ====================================================================== --
+
 if not game:IsLoaded() then
 	pcall(function() game.Loaded:Wait() end)
 end
@@ -18,7 +23,7 @@ local function detectPhone()
 end
 
 local IS_PHONE = detectPhone()
-local QUALITY = IS_PHONE and 0.65 or 1
+local QUALITY = IS_PHONE and 0.7 or 1
 
 local function quantity(count, minimum)
 	return math.max(minimum or 1, math.floor(count * QUALITY + 0.5))
@@ -70,7 +75,7 @@ Visuals.Settings = {
 	Extra = {
 		Glow        = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Range = 12, Brightness = 2, Pulse = true, ColorShift = true },
 		Aura        = { Enabled = false, Color = Color3.fromRGB(180, 130, 255), Count = 6, Radius = 3, Height = 2, Speed = 1.2, Shape = "Mixed" },
-		Footprints  = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Interval = 0.25, Size = 0.9, Duration = 1.5, Sparks = true },
+		Footprints  = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Interval = 0.28, Size = 0.9, Duration = 1.6, Sparks = true },
 		IdleSpin    = { Enabled = false, Speed = 0.8, Wobble = true },
 		SoulPet     = { Enabled = false, Color = Color3.fromRGB(120, 255, 200), Size = 0.5, Distance = 3, Height = 3, Speed = 1.0, Style = "Orb" },
 	},
@@ -79,7 +84,7 @@ Visuals.Settings = {
 local vis = Visuals.Settings
 
 --======================================================================--
---                      СИСТЕМА ПРЕСЕТОВ ЦВЕТА                          --
+--                      СИСТЕМА ЦВЕТОВЫХ ПРЕСЕТОВ                       --
 --======================================================================--
 local COLOR_PRESETS = {
 	{ name = "Obsidian",        icon = "🪨", colors = { Color3.fromRGB(60,40,120),  Color3.fromRGB(120,80,200),  Color3.fromRGB(80,60,160),  Color3.fromRGB(40,30,100),  Color3.fromRGB(60,40,120)  } },
@@ -111,6 +116,7 @@ local COLOR_PRESETS = {
 	{ name = "Ocean Deep",      icon = "🌊", colors = { Color3.fromRGB(0,30,80),    Color3.fromRGB(0,80,160),   Color3.fromRGB(0,140,220),  Color3.fromRGB(0,20,60),    Color3.fromRGB(0,30,80)    } },
 	{ name = "Volcanic",        icon = "🌋", colors = { Color3.fromRGB(255,60,0),   Color3.fromRGB(255,140,0),  Color3.fromRGB(200,40,0),   Color3.fromRGB(80,20,0),    Color3.fromRGB(255,60,0)   } },
 	{ name = "Neon Lime",       icon = "🟢", colors = { Color3.fromRGB(180,255,0), Color3.fromRGB(120,255,80), Color3.fromRGB(80,220,40),  Color3.fromRGB(40,160,20),  Color3.fromRGB(180,255,0)  } },
+	{ name = "Cosmic Dust",     icon = "🌀", colors = { Color3.fromRGB(120,60,200),Color3.fromRGB(200,100,255),Color3.fromRGB(255,120,200),Color3.fromRGB(60,40,120), Color3.fromRGB(120,60,200) } },
 	{ name = "Rainbow Glitter", icon = "🌈", colors = { Color3.fromRGB(255,0,128), Color3.fromRGB(255,200,0),  Color3.fromRGB(0,255,128),  Color3.fromRGB(0,128,255),  Color3.fromRGB(255,0,128)  } },
 }
 
@@ -148,6 +154,9 @@ local SPEED_PRESETS = {
 local COLOR_TARGETS = { "Jump", "Wings", "Halo", "Hat", "Trails", "KillFX" }
 local currentColorTarget = "Wings"
 
+local fxState = { rainbowHue = 0 }
+local fxConnection = nil
+
 local effectsFolder
 local character, humanoid, torso, headPart
 local wingsFolder, haloFolder, hatFolder
@@ -171,7 +180,9 @@ local glowConn       = nil
 local petFolder      = nil
 local petOrb         = nil
 local petLight       = nil
+local petTrail       = nil
 local petConn        = nil
+local petExtra       = {}
 local petCurrentPos  = nil
 
 local function ensureFolder()
@@ -258,6 +269,27 @@ local function spawnFlash(position, diameter, color, duration)
 	Debris:AddItem(flash, duration + 0.1)
 end
 
+local function spawnDisc(position, diameter, thickness, color, duration, expand)
+	local disc = Instance.new("Part")
+	disc.Shape        = Enum.PartType.Cylinder
+	disc.Size         = Vector3.new(thickness, diameter, diameter)
+	disc.CFrame       = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
+	disc.Anchored     = true
+	disc.CanCollide   = false
+	disc.CanQuery     = false
+	disc.CanTouch     = false
+	disc.CastShadow   = false
+	disc.Material     = Enum.Material.Neon
+	disc.Color        = color
+	disc.Transparency = 0.15
+	disc.Parent       = ensureFolder()
+	TweenService:Create(disc,
+		TweenInfo.new(duration, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		{ Size = Vector3.new(thickness * 0.4, diameter * expand, diameter * expand), Transparency = 1 }
+	):Play()
+	Debris:AddItem(disc, duration + 0.15)
+end
+
 local function spawnArcRing(origin, opts)
 	local segments   = quantity(opts.Segments or 26, 8)
 	local sweep      = opts.Sweep     or (math.pi * 2)
@@ -306,7 +338,12 @@ local function spawnArcRing(origin, opts)
 	end
 end
 
-Visuals.JumpStyles = { "Swirl", "Ring", "Vortex", "Triple", "Nova", "Shockwave" }
+Visuals.JumpStyles = {
+	"Swirl", "Ring", "Vortex", "Triple", "Nova",
+	"Ripple", "Comet", "Shockwave", "Petals",
+	"Bloom", "Spiral", "Galaxy", "Phoenix",
+	"Tsunami", "Kaleidoscope", "Black Hole",
+}
 
 local function playJumpEffect()
 	if not vis.Jump.Enabled or not torso then return end
@@ -321,22 +358,43 @@ local function playJumpEffect()
 	local color    = vis.Jump.Color
 	local duration = vis.Jump.Duration
 	local size     = vis.Jump.Size
+	local style    = vis.Jump.Style
 
 	if vis.Jump.Flash then spawnFlash(origin, size * 0.5, color, duration) end
 
-	spawnArcRing(origin, {
-		Color     = color,
-		Duration  = duration,
-		Segments  = 28,
-		Sweep     = math.rad(310),
-		Start     = 0,
-		Radius0   = size * 0.15,
-		Radius1   = size,
-		Thickness = size * 0.045,
-		Spin      = 0.7,
-		Rise      = 0.4,
-		Fade      = 0.85,
-	})
+	if style == "Ring" then
+		spawnArcRing(origin, {
+			Color = color, Duration = duration, Segments = 30,
+			Radius0 = size * 0.16, Radius1 = size, Thickness = size * 0.035,
+			Fade = 0.15, Rise = 0.25,
+		})
+	elseif style == "Ripple" then
+		for index = 1, 3 do
+			task.delay((index - 1) * 0.13, function()
+				spawnDisc(origin, size * (0.4 + index * 0.1), 0.14, color, duration, 2.1)
+			end)
+		end
+	elseif style == "Shockwave" then
+		spawnDisc(origin, size * 0.5, 0.18, color, duration, 2.6)
+		spawnArcRing(origin, {
+			Color = color, Duration = duration * 0.9, Segments = 34,
+			Radius0 = size * 0.3, Radius1 = size * 1.3, Thickness = size * 0.025, Fade = 0.05,
+		})
+	else
+		spawnArcRing(origin, {
+			Color     = color,
+			Duration  = duration,
+			Segments  = 28,
+			Sweep     = math.rad(310),
+			Start     = 0,
+			Radius0   = size * 0.15,
+			Radius1   = size,
+			Thickness = size * 0.045,
+			Spin      = 0.7,
+			Rise      = 0.4,
+			Fade      = 0.85,
+		})
+	end
 end
 
 --======================================================================--
@@ -373,7 +431,7 @@ local function addFeather(side, opts)
 	return feather
 end
 
-Visuals.WingStyles = { "Angel", "Demon", "Phantom", "Simple", "Crystal", "Butterfly" }
+Visuals.WingStyles = { "Angel", "Demon", "Phantom", "Simple", "Crystal", "Butterfly", "Fallen", "Cyber", "Phoenix-Wings", "Seraph", "Dragon", "Fairy", "Void", "Sacred" }
 
 local function buildWings()
 	clearWings()
@@ -428,7 +486,7 @@ local function clearHalo()
 	end
 end
 
-Visuals.HaloStyles = { "Ring", "Double", "Orbs", "Tilted", "Star" }
+Visuals.HaloStyles = { "Ring", "Double", "Orbs", "Tilted", "Star", "Crown", "Sun", "Hexagon", "Lotus", "Infinity", "Prism" }
 
 local function buildHalo()
 	clearHalo()
@@ -442,7 +500,7 @@ local function buildHalo()
 	local pc    = vis.Halo.PresetColors
 	local function colAt(ratio) return presetColorAt(pc, color, ratio) end
 
-	local segments = quantity(20, 12)
+	local segments = quantity(22, 12)
 	local radius = 0.9
 	local segmentLength = (2 * math.pi * radius / segments) * 1.12
 	for index = 1, segments do
@@ -469,10 +527,63 @@ local function buildHalo()
 end
 
 --======================================================================--
+--                        CHINA HAT                                     --
+--======================================================================--
+local function clearChinaHat()
+	if hatFolder then hatFolder:Destroy() end
+	hatFolder = nil
+	hatParts  = {}
+	if headPart then
+		for _, child in ipairs(headPart:GetChildren()) do
+			if child.Name == "CrystalHub_HatGlow" then child:Destroy() end
+		end
+	end
+end
+
+Visuals.HatStyles = { "Layered", "Cone", "Rings", "Spikes", "Crown", "Sun-Rays", "Aura", "Ice-Crystal", "Pagoda", "Diamond" }
+
+local function buildChinaHat()
+	clearChinaHat()
+	if not vis.ChinaHat.Enabled or not headPart then return end
+
+	hatFolder = Instance.new("Folder")
+	hatFolder.Name   = "CrystalHub_ChinaHat"
+	hatFolder.Parent = character
+
+	local color = vis.ChinaHat.Color
+	local size  = math.clamp(vis.ChinaHat.Size or 1, 0.4, 3)
+	local pc    = vis.ChinaHat.PresetColors
+	local function colAt(ratio) return presetColorAt(pc, color, ratio) end
+
+	local steps = quantity(5, 3)
+	for index = 1, steps do
+		local ratio  = (index - 1) / (steps - 1)
+		local radius = (2.8 - ratio * 2.3) * size
+		local height = (1.78 + ratio * 1.8) * size
+		local part = newNeonPart(Vector3.new(0.16 * size, radius * 2, radius * 2), colAt(ratio))
+		part.Shape = Enum.PartType.Cylinder
+		part.Transparency = 0.2
+		part.Parent = hatFolder
+		local weld = weldTo(headPart, part, CFrame.new(0, height, 0) * CFrame.Angles(0, 0, math.rad(90)))
+		table.insert(hatParts, { Weld = weld, Kind = "disc", Height = height })
+	end
+
+	if vis.ChinaHat.Glow then
+		local pointLight = Instance.new("PointLight")
+		pointLight.Color = color
+		pointLight.Brightness = 1.8
+		pointLight.Range = 11
+		pointLight.Shadows = false
+		pointLight.Name = "CrystalHub_HatGlow"
+		pointLight.Parent = headPart
+	end
+end
+
+--======================================================================--
 --                        ОБЩИЙ ЦИКЛ АНИМАЦИИ                           --
 --======================================================================--
 local function stopLoopIfIdle()
-	if #wingParts == 0 and #haloParts == 0 and animConnection then
+	if #wingParts == 0 and #haloParts == 0 and #hatParts == 0 and animConnection then
 		animConnection:Disconnect()
 		animConnection = nil
 	end
@@ -521,6 +632,18 @@ local function ensureLoop()
 					* CFrame.Angles(idleWobble, angle, 0)
 					* CFrame.new(0, 0, -item.Radius)
 					* CFrame.Angles(0, math.rad(90), 0)
+			end
+		end
+
+		if #hatParts > 0 then
+			local spin = animClock * (vis.ChinaHat.Spin or 0)
+			if vis.Extra.IdleSpin.Enabled then spin = spin + idleSpinAngle end
+			for _, item in ipairs(hatParts) do
+				if item.Weld and item.Weld.Parent then
+					item.Weld.C0 = CFrame.new(0, item.Height, 0)
+						* CFrame.Angles(idleWobble, spin, 0)
+						* CFrame.Angles(0, 0, math.rad(90))
+				end
 			end
 		end
 	end)
@@ -641,7 +764,8 @@ local function bindCharacter(char)
 
 	if vis.Wings.Enabled then buildWings() end
 	if vis.Halo.Enabled then buildHalo() end
-	if #wingParts > 0 or #haloParts > 0 then ensureLoop() end
+	if vis.ChinaHat.Enabled then buildChinaHat() end
+	if #wingParts > 0 or #haloParts > 0 or #hatParts > 0 then ensureLoop() end
 
 	if vis.Extra.Glow.Enabled then buildGlow() ensureGlowLoop() end
 	if vis.Extra.SoulPet.Enabled then buildSoulPet() ensureSoulPetLoop() end
@@ -654,7 +778,7 @@ characterConnection = LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 --======================================================================--
---                         АВТОНОМНЫЙ UI (GUI)                          --
+--                         СИСТЕМА GUI (PRO STANDALONE)                 --
 --======================================================================--
 local function getSafeGui()
 	local ok, res = pcall(function()
@@ -677,11 +801,11 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = parentGui
 
--- Плавающая кнопка (открытие/закрытие)
+-- Плавающая кнопка вызова
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 48, 0, 48)
 ToggleBtn.Position = UDim2.new(0, 15, 0.45, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 42)
 ToggleBtn.Text = "🔮"
 ToggleBtn.TextSize = 24
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -693,8 +817,8 @@ local btnStroke = Instance.new("UIStroke") btnStroke.Color = Color3.fromRGB(140,
 
 -- Главное окно
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, IS_PHONE and 380 or 480, 0, IS_PHONE and 280 or 340)
-MainFrame.Position = UDim2.new(0.5, -((IS_PHONE and 380 or 480)/2), 0.5, -((IS_PHONE and 280 or 340)/2))
+MainFrame.Size = UDim2.new(0, IS_PHONE and 420 or 520, 0, IS_PHONE and 310 or 370)
+MainFrame.Position = UDim2.new(0.5, -((IS_PHONE and 420 or 520)/2), 0.5, -((IS_PHONE and 310 or 370)/2))
 MainFrame.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -705,7 +829,7 @@ local mainStroke = Instance.new("UIStroke") mainStroke.Color = Color3.fromRGB(90
 
 -- Заголовок
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 36)
+TitleBar.Size = UDim2.new(1, 0, 0, 38)
 TitleBar.BackgroundColor3 = Color3.fromRGB(22, 24, 38)
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = MainFrame
@@ -715,15 +839,15 @@ titleLbl.Size = UDim2.new(1, -50, 1, 0)
 titleLbl.Position = UDim2.new(0, 12, 0, 0)
 titleLbl.BackgroundTransparency = 1
 titleLbl.Font = Enum.Font.GothamBold
-titleLbl.Text = "✨ Crystal Hub Visuals"
+titleLbl.Text = "✨ Crystal Hub — Visuals (Full Edition)"
 titleLbl.TextColor3 = Color3.fromRGB(230, 230, 255)
 titleLbl.TextSize = 14
 titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 titleLbl.Parent = TitleBar
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -34, 0, 3)
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -36, 0, 3)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Text = "✕"
 CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -757,8 +881,8 @@ end)
 
 -- Сайдбар
 local TabBar = Instance.new("ScrollingFrame")
-TabBar.Size = UDim2.new(0, 110, 1, -36)
-TabBar.Position = UDim2.new(0, 0, 0, 36)
+TabBar.Size = UDim2.new(0, 120, 1, -38)
+TabBar.Position = UDim2.new(0, 0, 0, 38)
 TabBar.BackgroundColor3 = Color3.fromRGB(18, 20, 32)
 TabBar.BorderSizePixel = 0
 TabBar.ScrollBarThickness = 2
@@ -766,12 +890,12 @@ TabBar.AutomaticCanvasSize = Enum.AutomaticSize.Y
 TabBar.Parent = MainFrame
 
 local tabLayout = Instance.new("UIListLayout")
-tabLayout.Padding = UDim.new(0, 3)
+tabLayout.Padding = UDim.new(0, 4)
 tabLayout.Parent = TabBar
 
 local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -110, 1, -36)
-ContentArea.Position = UDim2.new(0, 110, 0, 36)
+ContentArea.Size = UDim2.new(1, -120, 1, -38)
+ContentArea.Position = UDim2.new(0, 120, 0, 38)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
@@ -787,11 +911,11 @@ local function createTab(name, icon)
 	page.Parent = ContentArea
 
 	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 5)
+	list.Padding = UDim.new(0, 6)
 	list.Parent = page
 
 	local tabBtn = Instance.new("TextButton")
-	tabBtn.Size = UDim2.new(1, -6, 0, 28)
+	tabBtn.Size = UDim2.new(1, -6, 0, 30)
 	tabBtn.BackgroundColor3 = Color3.fromRGB(26, 28, 44)
 	tabBtn.Text = (icon or "") .. " " .. name
 	tabBtn.TextColor3 = Color3.fromRGB(180, 180, 210)
@@ -822,9 +946,172 @@ local function createTab(name, icon)
 	return page
 end
 
+-- ВЫПАДАЮЩАЯ ТАБЛИЦА (DROPDOWN)
+local function addDropdown(page, labelText, options, defaultVal, callback)
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(1, -6, 0, 34)
+	container.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
+	container.ClipsDescendants = true
+	container.Parent = page
+
+	local cCorner = Instance.new("UICorner") cCorner.CornerRadius = UDim.new(0, 6) cCorner.Parent = container
+
+	local header = Instance.new("TextButton")
+	header.Size = UDim2.new(1, 0, 0, 34)
+	header.BackgroundTransparency = 1
+	header.Text = ""
+	header.Parent = container
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.4, 0, 1, 0)
+	lbl.Position = UDim2.new(0, 8, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.Gotham
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
+	lbl.TextSize = 11
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = header
+
+	local selectedLbl = Instance.new("TextLabel")
+	selectedLbl.Size = UDim2.new(0.55, -24, 1, 0)
+	selectedLbl.Position = UDim2.new(0.4, 0, 0, 0)
+	selectedLbl.BackgroundTransparency = 1
+	selectedLbl.Font = Enum.Font.GothamMedium
+	selectedLbl.Text = tostring(defaultVal or options[1] or "Select")
+	selectedLbl.TextColor3 = Color3.fromRGB(150, 130, 255)
+	selectedLbl.TextSize = 11
+	selectedLbl.TextXAlignment = Enum.TextXAlignment.Right
+	selectedLbl.Parent = header
+
+	local arrow = Instance.new("TextLabel")
+	arrow.Size = UDim2.new(0, 20, 1, 0)
+	arrow.Position = UDim2.new(1, -22, 0, 0)
+	arrow.BackgroundTransparency = 1
+	arrow.Font = Enum.Font.GothamBold
+	arrow.Text = "▼"
+	arrow.TextColor3 = Color3.fromRGB(180, 180, 200)
+	arrow.TextSize = 10
+	arrow.Parent = header
+
+	local listFrame = Instance.new("ScrollingFrame")
+	listFrame.Size = UDim2.new(1, -12, 0, 120)
+	listFrame.Position = UDim2.new(0, 6, 0, 36)
+	listFrame.BackgroundColor3 = Color3.fromRGB(18, 20, 32)
+	listFrame.BorderSizePixel = 0
+	listFrame.ScrollBarThickness = 2
+	listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	listFrame.Parent = container
+
+	local listCorner = Instance.new("UICorner") listCorner.CornerRadius = UDim.new(0, 4) listCorner.Parent = listFrame
+	local ulist = Instance.new("UIListLayout") ulist.Padding = UDim.new(0, 2) ulist.Parent = listFrame
+
+	local isOpen = false
+	header.MouseButton1Click:Connect(function()
+		isOpen = not isOpen
+		arrow.Text = isOpen and "▲" or "▼"
+		container.Size = isOpen and UDim2.new(1, -6, 0, 164) or UDim2.new(1, -6, 0, 34)
+	end)
+
+	for _, opt in ipairs(options) do
+		local itemBtn = Instance.new("TextButton")
+		itemBtn.Size = UDim2.new(1, 0, 0, 24)
+		itemBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 42)
+		itemBtn.Font = Enum.Font.Gotham
+		itemBtn.Text = "  " .. tostring(opt)
+		itemBtn.TextColor3 = Color3.fromRGB(230, 230, 250)
+		itemBtn.TextSize = 11
+		itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+		itemBtn.Parent = listFrame
+
+		itemBtn.MouseButton1Click:Connect(function()
+			selectedLbl.Text = tostring(opt)
+			isOpen = false
+			arrow.Text = "▼"
+			container.Size = UDim2.new(1, -6, 0, 34)
+			callback(opt)
+		end)
+	end
+end
+
+-- СЛАЙДЕР (SLIDER)
+local function addSlider(page, labelText, minVal, maxVal, defaultVal, callback)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -6, 0, 42)
+	row.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
+	row.Parent = page
+
+	local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = row
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.6, 0, 0, 18)
+	lbl.Position = UDim2.new(0, 8, 0, 2)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.Gotham
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
+	lbl.TextSize = 11
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local valLbl = Instance.new("TextLabel")
+	valLbl.Size = UDim2.new(0.35, 0, 0, 18)
+	valLbl.Position = UDim2.new(0.65, -8, 0, 2)
+	valLbl.BackgroundTransparency = 1
+	valLbl.Font = Enum.Font.GothamBold
+	valLbl.Text = tostring(defaultVal)
+	valLbl.TextColor3 = Color3.fromRGB(160, 140, 255)
+	valLbl.TextSize = 11
+	valLbl.TextXAlignment = Enum.TextXAlignment.Right
+	valLbl.Parent = row
+
+	local track = Instance.new("TextButton")
+	track.Size = UDim2.new(1, -16, 0, 8)
+	track.Position = UDim2.new(0, 8, 0, 26)
+	track.BackgroundColor3 = Color3.fromRGB(40, 42, 60)
+	track.Text = ""
+	track.Parent = row
+
+	local tCorner = Instance.new("UICorner") tCorner.CornerRadius = UDim.new(1, 0) tCorner.Parent = track
+	local fill = Instance.new("Frame")
+	local pct = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
+	fill.Size = UDim2.new(pct, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(130, 90, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	local fCorner = Instance.new("UICorner") fCorner.CornerRadius = UDim.new(1, 0) fCorner.Parent = fill
+
+	local function update(input)
+		local x = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		fill.Size = UDim2.new(x, 0, 1, 0)
+		local val = minVal + (maxVal - minVal) * x
+		val = math.floor(val * 10 + 0.5) / 10
+		valLbl.Text = tostring(val)
+		callback(val)
+	end
+
+	local isDragging = false
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isDragging = true
+			update(input)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isDragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			update(input)
+		end
+	end)
+end
+
+-- ТУМБЛЕР (TOGGLE)
 local function addToggle(page, labelText, default, callback)
 	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, -6, 0, 30)
+	row.Size = UDim2.new(1, -6, 0, 32)
 	row.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
 	row.Parent = page
 
@@ -857,98 +1144,148 @@ local function addToggle(page, labelText, default, callback)
 	end)
 end
 
-local function addDropdown(page, labelText, options, callback)
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, -6, 0, 32)
-	row.BackgroundColor3 = Color3.fromRGB(24, 26, 40)
-	row.Parent = page
+--======================================================================--
+--                         СТРАНИЦЫ И ЭЛЕМЕНТЫ                          --
+--======================================================================--
 
-	local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = row
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(0.4, 0, 1, 0)
-	lbl.Position = UDim2.new(0, 8, 0, 0)
-	lbl.BackgroundTransparency = 1
-	lbl.Font = Enum.Font.Gotham
-	lbl.Text = labelText
-	lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
-	lbl.TextSize = 11
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.Parent = row
-
-	local nextBtn = Instance.new("TextButton")
-	nextBtn.Size = UDim2.new(0.55, -8, 0, 22)
-	nextBtn.Position = UDim2.new(0.45, 0, 0.5, -11)
-	nextBtn.BackgroundColor3 = Color3.fromRGB(36, 38, 56)
-	nextBtn.Font = Enum.Font.GothamMedium
-	nextBtn.Text = tostring(options[1] or "Select")
-	nextBtn.TextColor3 = Color3.fromRGB(240, 240, 255)
-	nextBtn.TextSize = 10
-	nextBtn.Parent = row
-
-	local nCorner = Instance.new("UICorner") nCorner.CornerRadius = UDim.new(0, 4) nCorner.Parent = nextBtn
-
-	local idx = 1
-	nextBtn.MouseButton1Click:Connect(function()
-		idx = (idx % #options) + 1
-		local sel = options[idx]
-		nextBtn.Text = tostring(sel)
-		callback(sel)
-	end)
-end
-
--- Создаем разделы
+-- 🦘 JUMP
 local pageJump = createTab("Jump", "🦘")
 addToggle(pageJump, "Enable Jump Effect", vis.Jump.Enabled, function(v) vis.Jump.Enabled = v end)
-addDropdown(pageJump, "Style", Visuals.JumpStyles, function(v) vis.Jump.Style = v end)
+addDropdown(pageJump, "Style", Visuals.JumpStyles, vis.Jump.Style, function(v) vis.Jump.Style = v end)
+addSlider(pageJump, "Size", 3, 20, vis.Jump.Size, function(v) vis.Jump.Size = v end)
+addSlider(pageJump, "Duration", 0.3, 2.0, vis.Jump.Duration, function(v) vis.Jump.Duration = v end)
+addToggle(pageJump, "Ground Flash", vis.Jump.Flash, function(v) vis.Jump.Flash = v end)
+addToggle(pageJump, "Sparks", vis.Jump.Sparks, function(v) vis.Jump.Sparks = v end)
 
+-- 🪽 WINGS
 local pageWings = createTab("Wings", "🪽")
 addToggle(pageWings, "Enable Wings", vis.Wings.Enabled, function(v)
 	vis.Wings.Enabled = v
 	if v then buildWings() ensureLoop() else clearWings() stopLoopIfIdle() end
 end)
-addDropdown(pageWings, "Style", Visuals.WingStyles, function(v)
+addDropdown(pageWings, "Style", Visuals.WingStyles, vis.Wings.Style, function(v)
 	vis.Wings.Style = v
+	if vis.Wings.Enabled then buildWings() ensureLoop() end
+end)
+addSlider(pageWings, "Scale", 0.5, 2.5, vis.Wings.Scale, function(v)
+	vis.Wings.Scale = v
+	if vis.Wings.Enabled then buildWings() ensureLoop() end
+end)
+addSlider(pageWings, "Droop (Наклон)", 0, 35, vis.Wings.Droop, function(v)
+	vis.Wings.Droop = v
+	if vis.Wings.Enabled then buildWings() ensureLoop() end
+end)
+addToggle(pageWings, "Flapping (Взмахи)", vis.Wings.Flap, function(v) vis.Wings.Flap = v end)
+addToggle(pageWings, "Glow", vis.Wings.Glow, function(v)
+	vis.Wings.Glow = v
 	if vis.Wings.Enabled then buildWings() end
 end)
 
+-- ✨ HALO
 local pageHalo = createTab("Halo", "✨")
 addToggle(pageHalo, "Enable Halo", vis.Halo.Enabled, function(v)
 	vis.Halo.Enabled = v
 	if v then buildHalo() ensureLoop() else clearHalo() stopLoopIfIdle() end
 end)
-addDropdown(pageHalo, "Style", Visuals.HaloStyles, function(v)
+addDropdown(pageHalo, "Style", Visuals.HaloStyles, vis.Halo.Style, function(v)
 	vis.Halo.Style = v
+	if vis.Halo.Enabled then buildHalo() ensureLoop() end
+end)
+addSlider(pageHalo, "Speed", 0.2, 4.0, vis.Halo.Speed, function(v) vis.Halo.Speed = v end)
+addToggle(pageHalo, "Glow", vis.Halo.Glow, function(v)
+	vis.Halo.Glow = v
 	if vis.Halo.Enabled then buildHalo() end
 end)
 
+-- 👒 HAT
+local pageHat = createTab("Hat", "👒")
+addToggle(pageHat, "Enable China Hat", vis.ChinaHat.Enabled, function(v)
+	vis.ChinaHat.Enabled = v
+	if v then buildChinaHat() ensureLoop() else clearChinaHat() stopLoopIfIdle() end
+end)
+addDropdown(pageHat, "Style", Visuals.HatStyles, vis.ChinaHat.Style, function(v)
+	vis.ChinaHat.Style = v
+	if vis.ChinaHat.Enabled then buildChinaHat() ensureLoop() end
+end)
+addSlider(pageHat, "Size", 0.5, 2.5, vis.ChinaHat.Size, function(v)
+	vis.ChinaHat.Size = v
+	if vis.ChinaHat.Enabled then buildChinaHat() ensureLoop() end
+end)
+addSlider(pageHat, "Spin Speed", 0, 4.0, vis.ChinaHat.Spin, function(v) vis.ChinaHat.Spin = v end)
+addToggle(pageHat, "Glow", vis.ChinaHat.Glow, function(v)
+	vis.ChinaHat.Glow = v
+	if vis.ChinaHat.Enabled then buildChinaHat() end
+end)
+
+-- 🌟 EXTRA
 local pageExtra = createTab("Extra", "🌟")
 addToggle(pageExtra, "Ambient Glow", vis.Extra.Glow.Enabled, function(v)
 	vis.Extra.Glow.Enabled = v
 	if v then buildGlow() ensureGlowLoop() else clearGlow() end
 end)
-addToggle(pageExtra, "Idle Spin", vis.Extra.IdleSpin.Enabled, function(v)
-	vis.Extra.IdleSpin.Enabled = v
+addSlider(pageExtra, "Glow Range", 4, 40, vis.Extra.Glow.Range, function(v)
+	vis.Extra.Glow.Range = v
+	if vis.Extra.Glow.Enabled then buildGlow() end
 end)
+addSlider(pageExtra, "Glow Brightness", 0.5, 5.0, vis.Extra.Glow.Brightness, function(v)
+	vis.Extra.Glow.Brightness = v
+	if vis.Extra.Glow.Enabled then buildGlow() end
+end)
+addToggle(pageExtra, "Idle Spin (Halo/Hat)", vis.Extra.IdleSpin.Enabled, function(v)
+	vis.Extra.IdleSpin.Enabled = v
+	if not v then idleSpinAngle = 0 end
+end)
+addSlider(pageExtra, "Spin Speed", 0.2, 3.0, vis.Extra.IdleSpin.Speed, function(v) vis.Extra.IdleSpin.Speed = v end)
 addToggle(pageExtra, "Soul Pet", vis.Extra.SoulPet.Enabled, function(v)
 	vis.Extra.SoulPet.Enabled = v
 	if v then buildSoulPet() ensureSoulPetLoop() else clearSoulPet() end
 end)
+addDropdown(pageExtra, "Pet Style", Visuals.SoulPetStyles, vis.Extra.SoulPet.Style, function(v)
+	vis.Extra.SoulPet.Style = v
+	if vis.Extra.SoulPet.Enabled then buildSoulPet() ensureSoulPetLoop() end
+end)
+addSlider(pageExtra, "Pet Distance", 1.5, 6.0, vis.Extra.SoulPet.Distance, function(v) vis.Extra.SoulPet.Distance = v end)
+addSlider(pageExtra, "Pet Speed", 0.2, 5.0, vis.Extra.SoulPet.Speed, function(v) vis.Extra.SoulPet.Speed = v end)
 
+-- 🎨 COLORS & PRESETS
 local pageColors = createTab("Colors", "🎨")
 local PRESET_NAMES = {}
 for _, p in ipairs(COLOR_PRESETS) do table.insert(PRESET_NAMES, p.icon .. " " .. p.name) end
 
-addDropdown(pageColors, "Preset -> ALL", PRESET_NAMES, function(v)
+addDropdown(pageColors, "Preset -> Target", PRESET_NAMES, PRESET_NAMES[1], function(v)
+	for _, preset in ipairs(COLOR_PRESETS) do
+		if preset.icon .. " " .. preset.name == v then
+			local color = preset.colors[2] or preset.colors[1]
+			if currentColorTarget == "Jump" then vis.Jump.Color = color
+			elseif currentColorTarget == "Wings" then vis.Wings.Color = color vis.Wings.PresetColors = preset.colors if vis.Wings.Enabled then buildWings() end
+			elseif currentColorTarget == "Halo" then vis.Halo.Color = color vis.Halo.PresetColors = preset.colors if vis.Halo.Enabled then buildHalo() end
+			elseif currentColorTarget == "Hat" then vis.ChinaHat.Color = color vis.ChinaHat.PresetColors = preset.colors if vis.ChinaHat.Enabled then buildChinaHat() end
+			end
+			break
+		end
+	end
+end)
+
+addDropdown(pageColors, "Target (Цель)", COLOR_TARGETS, currentColorTarget, function(v)
+	currentColorTarget = v
+end)
+
+addDropdown(pageColors, "Preset -> ВСЕ Визуалы", PRESET_NAMES, PRESET_NAMES[1], function(v)
 	for _, preset in ipairs(COLOR_PRESETS) do
 		if preset.icon .. " " .. preset.name == v then
 			local color = preset.colors[2] or preset.colors[1]
 			vis.Jump.Color = color
 			vis.Wings.Color = color
+			vis.Wings.PresetColors = preset.colors
 			vis.Halo.Color = color
+			vis.Halo.PresetColors = preset.colors
+			vis.ChinaHat.Color = color
+			vis.ChinaHat.PresetColors = preset.colors
 			vis.Extra.Glow.Color = color
 			vis.Extra.SoulPet.Color = color
 			if vis.Wings.Enabled then buildWings() end
 			if vis.Halo.Enabled then buildHalo() end
+			if vis.ChinaHat.Enabled then buildChinaHat() end
 			if vis.Extra.Glow.Enabled then buildGlow() end
 			if vis.Extra.SoulPet.Enabled then buildSoulPet() end
 			break
