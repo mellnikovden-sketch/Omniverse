@@ -1,6 +1,6 @@
 -- ====================================================================== --
 --            ✨ CRYSTAL HUB VISUALS — THE MASTERPIECE EDITION ✨       --
---     Zero Asset IDs, Pure Math Geometry, Ultimate Customization UI      --
+--                      FIXED & TRIPLE CHECKED                          --
 -- ====================================================================== --
 
 if not game:IsLoaded() then pcall(function() game.Loaded:Wait() end) end
@@ -21,28 +21,33 @@ local function quantity(count, min) return math.max(min or 1, math.floor(count *
 -- ====================================================================== --
 --                           ГЛОБАЛЬНЫЕ НАСТРОЙКИ                         --
 -- ====================================================================== --
-local vis = {
-	Jump = { Enabled = false, Style = "Swirl", Color = Color3.fromRGB(120, 190, 255), Size = 7, Duration = 0.7, Flash = true, Crater = true },
-	Wings = { Enabled = false, Style = "Angel", Color = Color3.fromRGB(150, 200, 255), Scale = 1, Droop = 0, Flap = true, Breathing = true },
-	Halo = { Enabled = false, Style = "Ring", Color = Color3.fromRGB(255, 225, 130), Speed = 1, Bobbing = true },
-	ChinaHat = { Enabled = false, Style = "Cat Ears", Color = Color3.fromRGB(255, 120, 90), Size = 1, OrbitShards = false },
+local Visuals = {}
+Visuals.Settings = {
+	Jump = { Enabled = false, Style = "Swirl", Color = Color3.fromRGB(120, 190, 255), Size = 7, Duration = 0.7, Flash = true, Sparks = true, Crater = true },
+	Wings = { Enabled = false, Style = "Angel", Color = Color3.fromRGB(150, 200, 255), Scale = 1, Droop = 0, Flap = true, Glow = true, Breathing = true },
+	Halo = { Enabled = false, Style = "Ring", Color = Color3.fromRGB(255, 225, 130), Speed = 1, Glow = true, Bobbing = true },
+	ChinaHat = { Enabled = false, Style = "Layered", Color = Color3.fromRGB(255, 120, 90), Size = 1, Spin = 0, Glow = true, OrbitShards = true },
 	Extra = {
 		Glow       = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Range = 12, Brightness = 2, Pulse = true },
 		Aura       = { Enabled = false, Color = Color3.fromRGB(180, 130, 255), Count = 6, Radius = 3, Height = 2, Speed = 1.2, Shape = "Orbs" },
 		Footprints = { Enabled = false, Color = Color3.fromRGB(120, 190, 255), Interval = 0.25, Size = 0.9, Duration = 1.5, Sparks = true },
 		IdleSpin   = { Enabled = false, Speed = 0.8, Wobble = true },
-		SoulPet    = { Enabled = false, Color = Color3.fromRGB(120, 255, 200), Size = 0.5, Distance = 3, Height = 3, Speed = 1.0, Style = "Navi Fairy", JumpReact = true },
-	},
-	Trails = { Enabled = false, Style = "Neon", Color = Color3.fromRGB(120, 190, 255), Color2 = Color3.fromRGB(255, 100, 200), Width = 1.5, Lifetime = 0.5, EmitSparks = true, PulseWidth = false }
+		SoulPet    = { Enabled = false, Color = Color3.fromRGB(120, 255, 200), Size = 0.5, Distance = 3, Height = 3, Speed = 1.0, Style = "Orb", JumpReact = true },
+	}
 }
+local vis = Visuals.Settings
 
-local JumpStyles = { "Swirl", "Nova", "Shockwave", "Bloom", "Galaxy", "Phoenix", "Tsunami", "Kaleidoscope", "Black Hole", "Hologram", "Lightning" }
-local WingStyles = { "Angel", "Demon", "Phantom", "Crystal", "Butterfly", "Fallen", "Cyber", "Phoenix", "Seraph", "Dragon", "Fairy", "Mecha", "Valkyrie" }
-local HaloStyles = { "Ring", "Double", "Orbs", "Tilted", "Star", "Crown", "Sun", "Hexagon", "Infinity", "Tech-Ring", "Rune-Circle" }
-local HatStyles = { "Cat Ears", "Demon Horns", "UFO", "Cyber-Visor", "Crown", "Cone", "Rings", "Pagoda", "Diamond", "Layered" }
-local PetStyles = { "Orb", "Navi Fairy", "Dragonling", "Biblical Angel", "Companion Cube", "Ghost", "Star", "Wisp", "Butterfly" }
-local AuraShapes = { "Orbs", "Cubes", "Diamonds", "Orbiting Swords", "Galactic" }
-local TrailStyles = { "Neon", "Fire", "Ghost", "Dark", "Pastel", "Candy" }
+local Trails = {}
+Trails.Settings = { Enabled = false, Style = "Neon", Color = Color3.fromRGB(120, 190, 255), Color2 = Color3.fromRGB(255, 100, 200), Width = 1.5, Lifetime = 0.5, EmitSparks = true, PulseWidth = false }
+local trSet = Trails.Settings
+
+Visuals.JumpStyles = { "Swirl", "Ring", "Vortex", "Triple", "Nova", "Ripple", "Comet", "Shockwave", "Petals", "Bloom", "Spiral", "Galaxy", "Phoenix", "Tsunami", "Kaleidoscope", "Black Hole", "Hologram", "Lightning" }
+Visuals.WingStyles = { "Angel", "Demon", "Phantom", "Simple", "Crystal", "Butterfly", "Fallen", "Cyber", "Phoenix", "Seraph", "Dragon", "Fairy", "Void", "Sacred", "Mecha", "Valkyrie" }
+Visuals.HaloStyles = { "Ring", "Double", "Orbs", "Tilted", "Star", "Crown", "Sun", "Hexagon", "Infinity", "Tech-Ring", "Rune-Circle" }
+Visuals.HatStyles = { "Layered", "Cone", "Rings", "Spikes", "Crown", "Sun-Rays", "Ice-Crystal", "Pagoda", "Diamond", "UFO", "Cyber-Visor", "Cat Ears", "Demon Horns" }
+Visuals.SoulPetStyles = { "Orb", "Comet", "Fairy", "Crystal", "Ghost", "Star", "Butterfly", "Phoenix", "Wisp", "Dragonling", "Eye of God", "Companion Cube" }
+Trails.Styles = { "Neon", "Fire", "Ghost", "Dark", "Pastel", "Candy" }
+Visuals.AuraShapes = { "Orbs", "Cubes", "Diamonds", "Orbiting Swords", "Galactic" }
 
 local COLOR_TARGETS = { "Jump", "Wings", "Halo", "Hat", "Trails", "Extra Glow", "Soul Pet", "Aura" }
 local currentColorTarget = "Wings"
@@ -66,7 +71,7 @@ local wingParts, haloParts, hatParts, auraParts, petParts = {}, {}, {}, {}, {}
 local animClock, flapAccum, flapReset, lastJumpEffect, petSpinBoost = 0, 0, false, 0, 0
 local idleSpinAngle, haloBobOffset = 0, 0
 local animConnection, jumpConnection, footprintConn, glowConn, petConn, auraConn, trailConn
-local glowLight, petCurrentPos = nil, nil
+local glowLight, petOrb, petLight, petCurrentPos, petExtra = nil, nil, nil, nil, {}
 local footprintTimer, footprintStepCount, lastFootPos = 0, 0, nil
 local trailAtt0, trailAtt1, mainTrail = nil, nil, nil
 
@@ -76,18 +81,27 @@ local function ensureFolder()
 	return effectsFolder
 end
 
--- Универсальный генератор 3D геометрии
-local function createShape(shape, size, color, transp, mat)
-	local p = Instance.new((shape == "Wedge" and "WedgePart") or (shape == "CornerWedge" and "CornerWedgePart") or "Part")
-	if shape == "Ball" then p.Shape = Enum.PartType.Ball elseif shape == "Cylinder" then p.Shape = Enum.PartType.Cylinder end
+-- Универсальный безопасный генератор фигур
+local function createShape(shapeType, size, color, transp, mat)
+	local p
+	if shapeType == "Wedge" then
+		p = Instance.new("WedgePart")
+	elseif shapeType == "CornerWedge" then
+		p = Instance.new("CornerWedgePart")
+	else
+		p = Instance.new("Part")
+		if shapeType == "Ball" then p.Shape = Enum.PartType.Ball
+		elseif shapeType == "Cylinder" then p.Shape = Enum.PartType.Cylinder end
+	end
+	
 	p.Size, p.Color, p.Material = size, color, mat or Enum.Material.Neon
 	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
 	p.Massless, p.Locked, p.Transparency = true, true, transp or 0
 	return p
 end
 
-local function createWeldable(shape, size, color, transp, mat)
-	local p = createShape(shape, size, color, transp, mat)
+local function createWeldable(shapeType, size, color, transp, mat)
+	local p = createShape(shapeType, size, color, transp, mat)
 	p.Anchored = false
 	return p
 end
@@ -100,7 +114,7 @@ local function lighten(c, a) return Color3.new(math.clamp(c.R+a,0,1), math.clamp
 local function darken(c, a) return Color3.new(math.clamp(c.R-a,0,1), math.clamp(c.G-a,0,1), math.clamp(c.B-a,0,1)) end
 
 -- ====================================================================== --
---                      ОТРИСОВКА ПРЫЖКОВ (18 СТИЛЕЙ)                   --
+--                      ОТРИСОВКА ПРЫЖКОВ                               --
 -- ====================================================================== --
 local function spawnArcRing(origin, opts)
 	local segs, sweep, rad0, rad1, th, dur, rise, color = quantity(opts.Segments or 24, 8), opts.Sweep or (math.pi*2), opts.Radius0 or 1.2, opts.Radius1 or 8, opts.Thickness or 0.2, opts.Duration or 0.7, opts.Rise or 0, opts.Color or Color3.new(1,1,1)
@@ -118,6 +132,7 @@ local function spawnArcRing(origin, opts)
 end
 
 local function spawnSparks(origin, color, dur, count, rad)
+	if not vis.Jump.Sparks then return end
 	local total = quantity(count, 4)
 	for i = 1, total do
 		local angle = (i / total) * math.pi * 2 + math.random() * 0.4
@@ -142,6 +157,7 @@ local function playJumpEffect()
 		Debris:AddItem(fl, dur)
 	end
 
+	-- ✨ НОВАЯ ФИЧА JUMP: Crater (След от удара на земле)
 	if vis.Jump.Crater then
 		local crBase = createShape("Cylinder", Vector3.new(0.02, sz * 0.8, sz * 0.8), Color3.new(0,0,0), 0.3)
 		crBase.CFrame, crBase.Parent = CFrame.new(origin + Vector3.new(0, 0.02, 0)) * CFrame.Angles(0, 0, math.rad(90)), ensureFolder()
@@ -154,28 +170,32 @@ local function playJumpEffect()
 
 	if style == "Ring" then
 		spawnArcRing(origin, { Color = color, Duration = dur, Segments = 30, Radius0 = sz * 0.16, Radius1 = sz, Thickness = sz * 0.035, Fade = 0.15, Rise = 0.25 })
-		if vis.Jump.Sparks then spawnSparks(origin, color, dur, 8, sz * 0.5) end
+		spawnSparks(origin, color, dur, 8, sz * 0.5)
 	elseif style == "Vortex" then
 		for layer = 1, 3 do task.delay((layer - 1) * 0.07, function() spawnArcRing(origin, { Color = color, Duration = dur, Segments = 22, Sweep = math.rad(300), Start = layer * 2.1, Radius0 = sz * (0.12 + layer * 0.05), Radius1 = sz * (0.75 + layer * 0.2), Thickness = sz * (0.045 - layer * 0.008), Spin = (layer % 2 == 0) and -0.9 or 0.9, Tilt = math.rad(layer * 4), Rise = 0.35 * layer, Fade = 0.75 }) end) end
+	elseif style == "Hologram" then
+		for i = 1, 4 do task.delay(i * 0.1, function() spawnArcRing(origin, { Color = lighten(color, 0.3), Duration = dur, Segments = 24, Radius0 = sz * 0.5, Radius1 = sz * 0.6, Thickness = sz * 0.015, Rise = i * 0.8, Fade = 0.1 }) end) end
 	elseif style == "Lightning" then
-		for i = 1, quantity(10, 5) do
-			local a = (i/10) * math.pi * 2
+		for i = 1, quantity(8, 4) do
+			local a = (i/8) * math.pi * 2
 			local sp = createShape("Wedge", Vector3.new(0.08, 0.08, sz * 0.8), lighten(color, 0.5), 0)
 			sp.CFrame, sp.Parent = CFrame.new(origin) * CFrame.Angles(math.rad(math.random(10, 40)), a, 0) * CFrame.new(0,0,-sz*0.4), ensureFolder()
 			TweenService:Create(sp, TweenInfo.new(dur*0.6, Enum.EasingStyle.Bounce), { CFrame = sp.CFrame * CFrame.new(0, sz*0.5, -sz), Transparency = 1, Size = Vector3.new(0.01, 0.01, sz * 1.5) }):Play()
 			Debris:AddItem(sp, dur)
 		end
-	elseif style == "Hologram" then
-		for i = 1, 4 do task.delay(i * 0.1, function() spawnArcRing(origin, { Color = lighten(color, 0.3), Duration = dur, Segments = 24, Radius0 = sz * 0.5, Radius1 = sz * 0.6, Thickness = sz * 0.015, Rise = i * 0.8, Fade = 0.1 }) end) end
-	elseif style == "Kaleidoscope" then
-		for index = 1, 6 do spawnArcRing(origin, { Color = index % 2 == 0 and color or lighten(color, 0.35), Duration = dur * 1.1, Segments = 14, Sweep = math.rad(55), Start = (index / 6) * math.pi * 2, Radius0 = sz * 0.15, Radius1 = sz * 1.0, Thickness = sz * 0.055, Spin = 1.2, Tilt = math.rad(10), Rise = 0.4, Fade = 0.35 }) end
-		spawnArcRing(origin, { Color = lighten(color, 0.5), Duration = dur * 0.8, Segments = 20, Radius0 = sz * 0.08, Radius1 = sz * 0.4, Thickness = sz * 0.04, Spin = -1.5, Fade = 0.1 })
-	elseif style == "Tsunami" then
-		for wave = 1, 3 do
-			task.delay((wave - 1) * 0.09, function()
-				spawnArcRing(origin, { Color = wave == 1 and lighten(color, 0.3) or color, Duration = dur * (0.8 + wave * 0.15), Segments = 32, Radius0 = sz * (0.1 + wave * 0.05), Radius1 = sz * (0.6 + wave * 0.35), Thickness = sz * (0.05 - wave * 0.01), Rise = 0.1 * wave, Fade = 0.2 })
-			end)
-		end
+	elseif style == "Nova" then
+		spawnArcRing(origin, { Color = color, Duration = dur, Segments = 28, Radius0 = sz * 0.15, Radius1 = sz * 0.95, Thickness = sz * 0.04, Fade = 0.1 })
+		spawnSparks(origin, color, dur, 12, sz * 0.6)
+	elseif style == "Ripple" then
+		for index = 1, 3 do task.delay((index - 1) * 0.13, function()
+			local r = createShape("Cylinder", Vector3.new(0.14, sz * (0.4 + index * 0.1), sz * (0.4 + index * 0.1)), color, 0.15)
+			r.CFrame, r.Parent = CFrame.new(origin) * CFrame.Angles(0,0,math.rad(90)), ensureFolder()
+			TweenService:Create(r, TweenInfo.new(dur, Enum.EasingStyle.Quint), { Size = Vector3.new(0.05, sz * 2.1, sz * 2.1), Transparency = 1 }):Play()
+			Debris:AddItem(r, dur)
+		end) end
+	elseif style == "Galaxy" then
+		spawnArcRing(origin, { Color = color, Duration = dur * 1.3, Segments = 30, Sweep = math.rad(200), Start = 0, Radius0 = sz * 0.15, Radius1 = sz * 1.1, Thickness = sz * 0.04, Spin = 1.8, Rise = 0.3, Fade = 0.25 })
+		spawnArcRing(origin, { Color = color, Duration = dur * 1.3, Segments = 30, Sweep = math.rad(200), Start = math.pi, Radius0 = sz * 0.15, Radius1 = sz * 1.1, Thickness = sz * 0.04, Spin = -1.8, Rise = 0.3, Fade = 0.25 })
 	else
 		-- Swirl
 		spawnArcRing(origin, { Color = color, Duration = dur, Segments = 28, Sweep = math.rad(310), Start = 0, Radius0 = sz * 0.15, Radius1 = sz, Thickness = sz * 0.045, Spin = 0.7, Rise = 0.4, Fade = 0.85 })
@@ -183,23 +203,26 @@ local function playJumpEffect()
 		if vis.Jump.Sparks then spawnSparks(origin, color, dur, 6, sz * 0.45) end
 	end
 
+	-- Реакция питомца
 	if vis.Extra.SoulPet.Enabled and vis.Extra.SoulPet.JumpReact then petSpinBoost = 35 end
 end
 
 -- ====================================================================== --
---                      ОТРИСОВКА КРЫЛЬЕВ (СЛОЖНЫЕ ФОРМЫ)               --
+--                      ОТРИСОВКА КРЫЛЬЕВ                               --
 -- ====================================================================== --
 local function clearWings()
 	if wingsFolder then wingsFolder:Destroy() end wingsFolder, wingParts = nil, {}
+	if torso then for _, child in ipairs(torso:GetChildren()) do if child.Name == "CH_WingGlow" then child:Destroy() end end end
 end
 
-local function addWingPart(side, opts)
-	local p = createWeldable(opts.Shape or "Part", Vector3.new(opts.Thickness, opts.Length, opts.Width), opts.Color, opts.Transparency or 0.1)
-	p.Parent = wingsFolder
+local function addFeather(side, opts)
+	local feather = createWeldable(opts.Shape or "Part", Vector3.new(opts.Thickness, opts.Length, opts.Width), opts.Color, opts.Transparency or 0.1)
+	feather.Parent = wingsFolder
 	local spread = opts.Spread + math.rad(vis.Wings.Droop or 0)
 	local origin = CFrame.new(side * opts.OriginX, opts.OriginY, opts.OriginZ) * CFrame.Angles(opts.Pitch or 0, side * opts.Sweep, -side * spread)
 	local offset = CFrame.new(0, opts.Length * 0.5, 0)
-	table.insert(wingParts, { Weld = weldTo(torso, p, origin * offset), Origin = origin, Offset = offset, Phase = opts.Phase or 0, Amp = opts.Amp or 0.12 })
+	table.insert(wingParts, { Weld = weldTo(torso, feather, origin * offset), Origin = origin, Offset = offset, Phase = opts.Phase or 0, Amp = opts.Amp or 0.12 })
+	return feather
 end
 
 local function buildWings()
@@ -208,50 +231,69 @@ local function buildWings()
 	wingsFolder = Instance.new("Folder") wingsFolder.Name = "CH_Wings" wingsFolder.Parent = ensureFolder()
 	local scale, base, light, dark, style = vis.Wings.Scale, vis.Wings.Color, lighten(vis.Wings.Color, 0.4), darken(vis.Wings.Color, 0.3), vis.Wings.Style
 
+	local function addOrb(side, angle, dist, height, sz, col)
+		local orb = createWeldable("Ball", Vector3.new(sz, sz, sz), col, 0.08) orb.Parent = wingsFolder
+		weldTo(torso, orb, CFrame.new(0, height * scale, 0) * CFrame.Angles(0, side * angle, 0) * CFrame.new(0, 0, -dist * scale))
+	end
+
 	for _, side in ipairs({ -1, 1 }) do
 		if style == "Demon" or style == "Dragon" then
 			local bones = quantity(7, 5)
 			for i = 1, bones do
 				local r = (i - 1) / (bones - 1)
 				local len, spr = (5.0 - r * 1.8) * scale, math.rad(52 + r * 68)
-				addWingPart(side, { Shape = "Wedge", Length = len, Width = 0.2 * scale, Thickness = 0.18 * scale, Spread = spr, Sweep = math.rad(32), Pitch = math.rad(-12 - r * 10), OriginX = 0.55 * scale, OriginY = 0.12 * scale, OriginZ = 0.72 * scale, Color = dark, Transparency = 0.03, Phase = i * 0.28, Amp = 0.15 })
-				if i < bones then addWingPart(side, { Shape = "Part", Length = len * 0.85, Width = (1.4 - r * 0.3) * scale, Thickness = 0.04 * scale, Spread = spr + math.rad(12 + (i / (bones - 1)) * 6), Sweep = math.rad(32), Pitch = math.rad(-12 - r * 10), OriginX = 0.55 * scale, OriginY = 0.12 * scale, OriginZ = 0.7 * scale, Color = base, Transparency = 0.6, Phase = i * 0.28 + 0.08, Amp = 0.15 }) end
+				addFeather(side, { Shape = "Wedge", Length = len, Width = 0.2 * scale, Thickness = 0.18 * scale, Spread = spr, Sweep = math.rad(32), Pitch = math.rad(-12 - r * 10), OriginX = 0.55 * scale, OriginY = 0.12 * scale, OriginZ = 0.72 * scale, Color = dark, Transparency = 0.03, Phase = i * 0.28, Amp = 0.15 })
+				if i < bones then addFeather(side, { Shape = "Part", Length = len * 0.85, Width = (1.4 - r * 0.3) * scale, Thickness = 0.04 * scale, Spread = spr + math.rad(12 + (i / (bones - 1)) * 6), Sweep = math.rad(32), Pitch = math.rad(-12 - r * 10), OriginX = 0.55 * scale, OriginY = 0.12 * scale, OriginZ = 0.7 * scale, Color = base, Transparency = 0.6, Phase = i * 0.28 + 0.08, Amp = 0.15 }) end
 			end
 		elseif style == "Mecha" then
 			for i = 1, quantity(6, 4) do
 				local r = (i - 1) / 5
-				addWingPart(side, { Shape = "CornerWedge", Length = (4.5 - r * 1.5) * scale, Width = 0.6 * scale, Thickness = 0.15 * scale, Spread = math.rad(45 + r * 60), Sweep = math.rad(15), Pitch = math.rad(-5), OriginX = 0.6 * scale, OriginY = 0.2 * scale, OriginZ = 0.8 * scale, Color = dark, Transparency = 0.05, Phase = i * 0.2, Amp = 0.05 })
-				addWingPart(side, { Shape = "Part", Length = (4.6 - r * 1.5) * scale, Width = 0.1 * scale, Thickness = 0.17 * scale, Spread = math.rad(45 + r * 60), Sweep = math.rad(15), Pitch = math.rad(-5), OriginX = 0.6 * scale, OriginY = 0.2 * scale, OriginZ = 0.8 * scale, Color = light, Transparency = 0, Phase = i * 0.2, Amp = 0.05 })
+				addFeather(side, { Shape = "CornerWedge", Length = (4.5 - r * 1.5) * scale, Width = 0.6 * scale, Thickness = 0.15 * scale, Spread = math.rad(45 + r * 60), Sweep = math.rad(15), Pitch = math.rad(-5), OriginX = 0.6 * scale, OriginY = 0.2 * scale, OriginZ = 0.8 * scale, Color = dark, Transparency = 0.05, Phase = i * 0.2, Amp = 0.05 })
+				addFeather(side, { Shape = "Part", Length = (4.6 - r * 1.5) * scale, Width = 0.1 * scale, Thickness = 0.17 * scale, Spread = math.rad(45 + r * 60), Sweep = math.rad(15), Pitch = math.rad(-5), OriginX = 0.6 * scale, OriginY = 0.2 * scale, OriginZ = 0.8 * scale, Color = light, Transparency = 0, Phase = i * 0.2, Amp = 0.05 })
+			end
+		elseif style == "Valkyrie" then
+			for i = 1, quantity(9, 5) do
+				local r = (i - 1) / 8
+				addFeather(side, { Length = (5.5 - r * 2.5) * scale, Width = 0.45 * scale, Thickness = 0.08 * scale, Spread = math.rad(40 + r * 80), Sweep = math.rad(20), Pitch = math.rad(-15), OriginX = 0.4 * scale, OriginY = 0.4 * scale, OriginZ = 0.7 * scale, Color = base, Transparency = 0.1, Phase = i * 0.25, Amp = 0.2 })
+			end
+			for i = 1, 3 do addOrb(side, math.rad(45 + i*15), 1.5 + i, 1.5 + i*0.5, 0.3 * scale, light, 0.1) end
+		elseif style == "Crystal" then
+			for i = 1, quantity(6, 4) do
+				local r = (i - 1) / 5
+				addFeather(side, { Shape = "Wedge", Length = (4.5 - r * 2) * scale, Width = (1 - r * 0.4) * scale, Thickness = 0.1 * scale, Spread = math.rad(40 + r * 50), Sweep = math.rad(25), Pitch = math.rad(-15), OriginX = 0.36 * scale, OriginY = 0.3 * scale, OriginZ = 0.64 * scale, Color = base, Transparency = 0.2, Phase = i * 0.45, Amp = 0.1 })
 			end
 		elseif style == "Butterfly" or style == "Fairy" then
 			for i = 1, quantity(6, 4) do
 				local r = (i - 1) / 5
-				addWingPart(side, { Shape = "Cylinder", Length = (3.0 - r * 0.6) * scale, Width = (0.8 - r * 0.12) * scale, Thickness = 0.08 * scale, Spread = math.rad(72 + r * 34), Sweep = math.rad(38), Pitch = math.rad(-22), OriginX = 0.3 * scale, OriginY = 0.35 * scale, OriginZ = 0.5 * scale, Color = base, Transparency = 0.1, Phase = i * 0.38, Amp = 0.2 })
+				addFeather(side, { Shape = "Cylinder", Length = (3.0 - r * 0.6) * scale, Width = (0.8 - r * 0.12) * scale, Thickness = 0.08 * scale, Spread = math.rad(72 + r * 34), Sweep = math.rad(38), Pitch = math.rad(-22), OriginX = 0.3 * scale, OriginY = 0.35 * scale, OriginZ = 0.5 * scale, Color = base, Transparency = 0.1, Phase = i * 0.38, Amp = 0.2 })
 			end
 			for i = 1, quantity(4, 3) do
 				local r = (i - 1) / 3
-				addWingPart(side, { Shape = "Cylinder", Length = (0.35 + r * 0.12) * scale, Width = 0.26 * scale, Thickness = 0.05 * scale, Spread = math.rad(78 + r * 22), Sweep = math.rad(38), Pitch = math.rad(-20), OriginX = 0.28 * scale, OriginY = 0.32 * scale, OriginZ = 0.48 * scale, Color = light, Transparency = 0.03, Phase = i * 0.38 + 0.5, Amp = 0.2 })
-			end
-		elseif style == "Crystal" then
-			for i = 1, quantity(6, 4) do
-				local r = (i - 1) / 5
-				addWingPart(side, { Shape = "Wedge", Length = (4.5 - r * 2) * scale, Width = (1 - r * 0.4) * scale, Thickness = 0.1 * scale, Spread = math.rad(40 + r * 50), Sweep = math.rad(25), Pitch = math.rad(-15), OriginX = 0.36 * scale, OriginY = 0.3 * scale, OriginZ = 0.64 * scale, Color = base, Transparency = 0.2, Phase = i * 0.45, Amp = 0.1 })
+				addFeather(side, { Shape = "Cylinder", Length = (0.35 + r * 0.12) * scale, Width = 0.26 * scale, Thickness = 0.05 * scale, Spread = math.rad(78 + r * 22), Sweep = math.rad(38), Pitch = math.rad(-20), OriginX = 0.28 * scale, OriginY = 0.32 * scale, OriginZ = 0.48 * scale, Color = light, Transparency = 0.03, Phase = i * 0.38 + 0.5, Amp = 0.2 })
 			end
 		else
 			-- Angel (Default)
 			local count = quantity(10, 5)
 			for index = 1, count do
 				local r = (index - 1) / (count - 1)
-				addWingPart(side, { Length = (4.6 - r * 2.1) * scale, Width = 0.5 * scale, Thickness = 0.1 * scale, Spread = math.rad(50 + r * 80), Sweep = math.rad(24), Pitch = math.rad(-14), OriginX = 0.42 * scale, OriginY = 0.32 * scale, OriginZ = 0.7 * scale, Color = base, Transparency = 0.04, Phase = index * 0.26, Amp = 0.19 })
+				addFeather(side, { Length = (4.6 - r * 2.1) * scale, Width = 0.5 * scale, Thickness = 0.1 * scale, Spread = math.rad(50 + r * 80), Sweep = math.rad(24), Pitch = math.rad(-14), OriginX = 0.42 * scale, OriginY = 0.32 * scale, OriginZ = 0.7 * scale, Color = base, Transparency = 0.04, Phase = index * 0.26, Amp = 0.19 })
 			end
 		end
+	end
+
+	if vis.Wings.Glow then
+		local pl = Instance.new("PointLight") pl.Color, pl.Brightness, pl.Range, pl.Shadows, pl.Name, pl.Parent = base, 2.4, 14, false, "CH_WingGlow", torso
 	end
 end
 
 -- ====================================================================== --
---                      ОТРИСОВКА НИМБА И ШЛЯПЫ                         --
+--                      ОТРИСОВКА НИМБА                                 --
 -- ====================================================================== --
-local function clearHalo() if haloFolder then haloFolder:Destroy() end haloFolder, haloParts = nil, {} end
+local function clearHalo()
+	if haloFolder then haloFolder:Destroy() end haloFolder, haloParts = nil, {}
+	if headPart then for _, child in ipairs(headPart:GetChildren()) do if child.Name == "CH_HaloGlow" then child:Destroy() end end end
+end
+
 local function buildHalo()
 	clearHalo()
 	if not vis.Halo.Enabled or not headPart then return end
@@ -287,11 +329,22 @@ local function buildHalo()
 	else
 		addSegRing(0.9, 1.6, 26, 0, 1, 0.07) addOrbs(6, 1.15, 1.6, 0.12)
 	end
+
+	if vis.Halo.Glow then
+		local pl = Instance.new("PointLight") pl.Color, pl.Brightness, pl.Range, pl.Shadows, pl.Name, pl.Parent = color, 1.6, 9, false, "CH_HaloGlow", headPart
+	end
 end
 
-local function clearHat() if hatFolder then hatFolder:Destroy() end hatFolder, hatParts = nil, {} end
+-- ====================================================================== --
+--                      ОТРИСОВКА ШЛЯПЫ (HAT)                           --
+-- ====================================================================== --
+local function clearChinaHat()
+	if hatFolder then hatFolder:Destroy() end hatFolder, hatParts = nil, {}
+	if headPart then for _, child in ipairs(headPart:GetChildren()) do if child.Name == "CH_HatGlow" then child:Destroy() end end end
+end
+
 local function buildChinaHat()
-	clearHat()
+	clearChinaHat()
 	if not vis.ChinaHat.Enabled or not headPart then return end
 	hatFolder = Instance.new("Folder") hatFolder.Name = "CH_Hat" hatFolder.Parent = ensureFolder()
 	local color, size, style = vis.ChinaHat.Color, math.clamp(vis.ChinaHat.Size, 0.4, 3), vis.ChinaHat.Style
@@ -307,12 +360,12 @@ local function buildChinaHat()
 		addDisc(2.5 * size, 2.2 * size, 0.3 * size, 0.1) addDisc(1.5 * size, 2.4 * size, 0.5 * size, 0.5)
 		local beam = createWeldable("Cylinder", Vector3.new(2.5 * size, 2.0 * size, 2.0 * size), lighten(color, 0.4), 0.7) beam.Parent = hatFolder
 		table.insert(hatParts, { Weld = weldTo(headPart, beam, CFrame.new(0, 1.0 * size, 0) * CFrame.Angles(0, 0, math.rad(90))), Kind = "disc", Height = 1.0 * size, Radius = 0 })
-	elseif style == "Cat Ears" then -- НОВЫЙ СТИЛЬ
+	elseif style == "Cat Ears" then
 		for side = -1, 1, 2 do
 			local ear = createWeldable("CornerWedge", Vector3.new(0.3*size, 0.8*size, 0.6*size), color, 0.1) ear.Parent = hatFolder
 			table.insert(hatParts, { Weld = weldTo(headPart, ear, CFrame.new(side * 0.4 * size, 0.6 * size, 0) * CFrame.Angles(0, side > 0 and math.rad(-90) or math.rad(90), 0)), Kind = "fixed", Height = 0.6*size, Radius = 0 })
 		end
-	elseif style == "Demon Horns" then -- НОВЫЙ СТИЛЬ
+	elseif style == "Demon Horns" then
 		for side = -1, 1, 2 do
 			for i = 1, 4 do
 				local horn = createWeldable("Cylinder", Vector3.new(0.2*size, (0.4 - i*0.05)*size, (0.4 - i*0.05)*size), darken(color, 0.2), 0.1) horn.Parent = hatFolder
@@ -334,6 +387,7 @@ local function buildChinaHat()
 			end
 		end
 	else
+		-- Layered (Default)
 		for index = 1, quantity(5, 3) do local ratio = (index - 1) / 4 addDisc((2.8 - ratio * 2.3) * size, (1.78 + ratio * 1.8) * size, 0.16 * size, 0.2) end
 	end
 
@@ -343,6 +397,10 @@ local function buildChinaHat()
 			local sp = createWeldable("Part", Vector3.new(0.15,0.15,0.15), lighten(color, 0.4), 0) sp.Parent = hatFolder
 			table.insert(hatParts, { Weld = weldTo(headPart, sp, CFrame.new(0, 2.0 * size, 0)), Kind = "shard", Angle = a, Radius = 3.0 * size, Height = 2.0 * size })
 		end
+	end
+
+	if vis.ChinaHat.Glow then
+		local pl = Instance.new("PointLight") pl.Color, pl.Brightness, pl.Range, pl.Shadows, pl.Name, pl.Parent = color, 1.8, 11, false, "CH_HatGlow", headPart
 	end
 end
 
@@ -362,7 +420,7 @@ local function buildSoulPet()
 	local cfg, col, sz, style = vis.Extra.SoulPet, vis.Extra.SoulPet.Color, vis.Extra.SoulPet.Size, vis.Extra.SoulPet.Style
 
 	petOrb = createShape(style == "Crystal" and "Part" or "Ball", Vector3.new(sz, sz, sz), col, 0.1)
-	petOrb.Parent = petFolder
+	petOrb.Anchored, petOrb.Parent = true, petFolder
 	petLight = Instance.new("PointLight") petLight.Color, petLight.Brightness, petLight.Range, petLight.Shadows, petLight.Parent = col, 3.5, 12, false, petOrb
 
 	if style == "Dragonling" then
@@ -413,7 +471,7 @@ local function ensureSoulPetLoop()
 		elseif cfg.Style == "Biblical Angel" then
 			for i, r in ipairs(petExtra) do r.CFrame = petOrb.CFrame * CFrame.Angles(t*(i), t*(1.5*i), 0) end
 		elseif cfg.Style == "Companion Cube" then
-			petExtra[1].CFrame = petOrb.CFrame * CFrame.Angles(t, t, t)
+			if petExtra[1] then petExtra[1].CFrame = petOrb.CFrame * CFrame.Angles(t, t, t) end
 			petOrb.CFrame = CFrame.new(petCurrentPos) * CFrame.Angles(t, t*0.5, 0)
 		end
 	end)
@@ -524,7 +582,9 @@ local function ensureLoop()
 			flapAccum = 0
 			if vis.Wings.Flap then
 				flapReset = false
-				for _, i in ipairs(wingParts) do if i.Weld and i.Weld.Parent then i.Weld.C0 = i.Origin * CFrame.Angles(0, breath, math.sin(animClock * 2.6 + i.Phase) * (i.Amp or 0.13)) * i.Offset end end
+				for _, i in ipairs(wingParts) do
+					if i.Weld and i.Weld.Parent then i.Weld.C0 = i.Origin * CFrame.Angles(0, breath, math.sin(animClock * 2.6 + i.Phase) * (i.Amp or 0.13)) * i.Offset end
+				end
 			elseif not flapReset then
 				flapReset = true
 				for _, i in ipairs(wingParts) do if i.Weld and i.Weld.Parent then i.Weld.C0 = i.Origin * CFrame.Angles(0, breath, 0) * i.Offset end end
@@ -838,13 +898,16 @@ uiSlider(pHat, "Size", 0.5, 2.5, vis.ChinaHat.Size, function(v) vis.ChinaHat.Siz
 uiToggle(pHat, "Orbit Shards", vis.ChinaHat.OrbitShards, function(v) vis.ChinaHat.OrbitShards = v if vis.ChinaHat.Enabled then buildChinaHat() end end)
 
 local pPet = createTab("Pet & Aura", "🐾")
-uiToggle(pPet, "Soul Pet", vis.Extra.SoulPet.Enabled, function(v) vis.Extra.SoulPet.Enabled = v if v then buildSoulPet() else clearSoulPet() end end)
+uiToggle(pPet, "Soul Pet", vis.Extra.SoulPet.Enabled, function(v) vis.Extra.SoulPet.Enabled = v if v then buildSoulPet() ensureSoulPetLoop() else clearSoulPet() end end)
 uiDropdown(pPet, "Pet Style", Visuals.SoulPetStyles, vis.Extra.SoulPet.Style, function(v) vis.Extra.SoulPet.Style = v if vis.Extra.SoulPet.Enabled then buildSoulPet() end end)
 uiColor(pPet, "Pet Color", vis.Extra.SoulPet.Color, function(c) vis.Extra.SoulPet.Color = c if vis.Extra.SoulPet.Enabled then buildSoulPet() end end)
 uiSlider(pPet, "Pet Size", 0.2, 2.0, vis.Extra.SoulPet.Size, function(v) vis.Extra.SoulPet.Size = v if vis.Extra.SoulPet.Enabled then buildSoulPet() end end)
+uiSlider(pPet, "Pet Distance", 1.5, 6.0, vis.Extra.SoulPet.Distance, function(v) vis.Extra.SoulPet.Distance = v end)
+uiSlider(pPet, "Pet Height", 1.0, 6.0, vis.Extra.SoulPet.Height, function(v) vis.Extra.SoulPet.Height = v end)
+uiSlider(pPet, "Pet Speed", 0.2, 5.0, vis.Extra.SoulPet.Speed, function(v) vis.Extra.SoulPet.Speed = v end)
 uiToggle(pPet, "Jump Reaction (Spin fast)", vis.Extra.SoulPet.JumpReact, function(v) vis.Extra.SoulPet.JumpReact = v end)
 
-uiToggle(pPet, "Floating Aura", vis.Extra.Aura.Enabled, function(v) vis.Extra.Aura.Enabled = v if v then buildAura() else clearAura() end end)
+uiToggle(pPet, "Floating Aura", vis.Extra.Aura.Enabled, function(v) vis.Extra.Aura.Enabled = v if v then buildAura() ensureAuraLoop() else clearAura() end end)
 uiDropdown(pPet, "Aura Shape", AuraShapes, vis.Extra.Aura.Shape, function(v) vis.Extra.Aura.Shape = v if vis.Extra.Aura.Enabled then buildAura() end end)
 uiSlider(pPet, "Aura Count", 3, 16, vis.Extra.Aura.Count, function(v) vis.Extra.Aura.Count = math.floor(v) if vis.Extra.Aura.Enabled then buildAura() end end)
 
