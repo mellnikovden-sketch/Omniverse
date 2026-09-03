@@ -5919,7 +5919,171 @@ end
 --  See PluginExample.lua for the full API reference.
 --======================================================================--
 
-local shared = odh_shared_plugins
+-- ODH передаёт API через глобальную переменную odh_shared_plugins.
+-- В Delta этого API обычно нет, поэтому завершаем работу с понятной ошибкой,
+-- а не допускаем падение на вызове shared.AddSection.
+local runtimeEnv = (type(getgenv) == 'function' and getgenv()) or _G
+local shared = runtimeEnv and runtimeEnv.odh_shared_plugins
+if type(shared) ~= 'table' or type(shared.AddSection) ~= 'function' then
+    warn('[PrismFlux] ODH API не найден — включён автономный Roblox UI.')
+
+    local gui = Instance.new('ScreenGui')
+    gui.Name = 'PrismFluxUI'
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    pcall(function() gui.Parent = game:GetService('CoreGui') end)
+    if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild('PlayerGui') end
+
+    local panel = Instance.new('Frame')
+    panel.Size = UDim2.fromOffset(360, 520)
+    panel.Position = UDim2.new(0, 24, 0.5, -260)
+    panel.BackgroundColor3 = Color3.fromRGB(25, 27, 35)
+    panel.BorderSizePixel = 0
+    panel.Parent = gui
+    Instance.new('UICorner', panel).CornerRadius = UDim.new(0, 10)
+
+    local title = Instance.new('TextLabel')
+    title.Size = UDim2.new(1, -50, 0, 42)
+    title.Position = UDim2.fromOffset(14, 0)
+    title.BackgroundTransparency = 1
+    title.Text = 'PrismFlux Visuals'
+    title.TextColor3 = Color3.fromRGB(180, 220, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = panel
+
+    local close = Instance.new('TextButton')
+    close.Size = UDim2.fromOffset(34, 32)
+    close.Position = UDim2.new(1, -42, 0, 5)
+    close.BackgroundColor3 = Color3.fromRGB(55, 58, 70)
+    close.Text = '×'
+    close.TextColor3 = Color3.new(1, 1, 1)
+    close.TextSize = 22
+    close.Font = Enum.Font.GothamBold
+    close.Parent = panel
+    Instance.new('UICorner', close).CornerRadius = UDim.new(0, 7)
+    close.MouseButton1Click:Connect(function() panel.Visible = false end)
+
+    local scroll = Instance.new('ScrollingFrame')
+    scroll.Size = UDim2.new(1, -16, 1, -52)
+    scroll.Position = UDim2.fromOffset(8, 46)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 5
+    scroll.CanvasSize = UDim2.new()
+    scroll.Parent = panel
+    local layout = Instance.new('UIListLayout', scroll)
+    layout.Padding = UDim.new(0, 5)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        scroll.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 8)
+    end)
+
+    local function formatColor(color)
+        return string.format('%d, %d, %d',
+            math.floor(color.R * 255 + 0.5),
+            math.floor(color.G * 255 + 0.5),
+            math.floor(color.B * 255 + 0.5))
+    end
+
+    local function label(parent, text, height, color)
+        local item = Instance.new('TextLabel')
+        item.Size = UDim2.new(1, -8, 0, height or 28)
+        item.BackgroundTransparency = 1
+        item.Text = text
+        item.TextColor3 = color or Color3.fromRGB(225, 225, 235)
+        item.Font = Enum.Font.Gotham
+        item.TextSize = 13
+        item.TextWrapped = true
+        item.TextXAlignment = Enum.TextXAlignment.Left
+        item.Parent = parent
+        return item
+    end
+
+    local function button(parent, text)
+        local item = Instance.new('TextButton')
+        item.Size = UDim2.new(1, -8, 0, 30)
+        item.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+        item.TextColor3 = Color3.fromRGB(235, 235, 245)
+        item.Font = Enum.Font.Gotham
+        item.TextSize = 13
+        item.Text = text
+        item.AutoButtonColor = true
+        item.Parent = parent
+        Instance.new('UICorner', item).CornerRadius = UDim.new(0, 6)
+        return item
+    end
+
+    local function section(name)
+        local box = Instance.new('Frame')
+        box.Size = UDim2.new(1, -4, 0, 0)
+        box.AutomaticSize = Enum.AutomaticSize.Y
+        box.BackgroundColor3 = Color3.fromRGB(32, 35, 45)
+        box.BorderSizePixel = 0
+        box.Parent = scroll
+        Instance.new('UICorner', box).CornerRadius = UDim.new(0, 7)
+        local pad = Instance.new('UIPadding', box)
+        pad.PaddingTop = UDim.new(0, 6); pad.PaddingBottom = UDim.new(0, 6)
+        pad.PaddingLeft = UDim.new(0, 6); pad.PaddingRight = UDim.new(0, 6)
+        local list = Instance.new('UIListLayout', box)
+        list.Padding = UDim.new(0, 4)
+        label(box, name, 25, Color3.fromRGB(120, 195, 255)).Font = Enum.Font.GothamBold
+        local api = {}
+        function api:AddLabel(text) label(box, text, 25) end
+        function api:AddParagraph(head, text) label(box, head .. ': ' .. text, 54) end
+        function api:AddButton(text, callback)
+            button(box, text).MouseButton1Click:Connect(callback)
+        end
+        function api:AddToggle(text, callback)
+            local state = false
+            local item = button(box, 'OFF  |  ' .. text)
+            item.MouseButton1Click:Connect(function()
+                state = not state
+                item.Text = (state and 'ON   |  ' or 'OFF  |  ') .. text
+                item.BackgroundColor3 = state and Color3.fromRGB(35, 105, 85) or Color3.fromRGB(45, 48, 60)
+                callback(state)
+            end)
+        end
+        function api:AddDropdown(text, values, callback)
+            local index = 1
+            local item = button(box, text .. ': ' .. tostring(values[index] or ''))
+            item.MouseButton1Click:Connect(function()
+                index = index % math.max(#values, 1) + 1
+                item.Text = text .. ': ' .. tostring(values[index] or '')
+                callback(values[index])
+            end)
+        end
+        function api:AddSlider(text, minimum, maximum, value, callback)
+            local current = value or minimum
+            local item = button(box, string.format('%s: %s  [- / +]', text, tostring(current)))
+            item.MouseButton1Click:Connect(function()
+                current = current >= maximum and minimum or current + 1
+                item.Text = string.format('%s: %s  [- / +]', text, tostring(current))
+                callback(current)
+            end)
+        end
+        function api:AddColorpicker(text, color, callback)
+            local current = color
+            local item = button(box, text .. ': ' .. formatColor(current))
+            item.MouseButton1Click:Connect(function()
+                current = Color3.fromHSV((tick() * 0.15) % 1, 0.85, 1)
+                item.Text = text .. ': ' .. formatColor(current)
+                callback(current)
+            end)
+        end
+        return api
+    end
+
+    shared = { AddSection = section }
+    function shared.Notify(text, duration)
+        pcall(function()
+            game:GetService('StarterGui'):SetCore('SendNotification', {
+                Title = 'PrismFlux', Text = tostring(text), Duration = duration or 2
+            })
+        end)
+    end
+end
 
 
 local function notify(text, duration)
@@ -6330,4 +6494,4 @@ extraSection:AddToggle('Pet Aura (orbit sparks)', function(value)
 end)
 extraSection:AddParagraph('Info', 'Glow: pulsing coloured light. Aura: varied neon particles orbiting you. Footprints: glowing steps with sparks. Idle Spin: rotates + sways halo/hat. Soul Pet: a floating glowing companion that orbits you — 14 styles: Orb, Comet, Fairy, Crystal, Ghost, Star, Butterfly, Phoenix, Wisp, Dragonling, Eye of God, Companion Cube, Mini-Sun, Lightning-Orb.')
 
-notify('Visuals loaded', 2)
+notify('Visuals loaded', 2)2
